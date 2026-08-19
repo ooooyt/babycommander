@@ -1,0 +1,159 @@
+# Hook configuration for tool call safety levels
+# This file is loaded separately from agents.yaml
+enabled: true
+rules:
+  - tool: "ShellTool"
+    level: "dangerous"
+  - tool: "FileSystemTool"
+    level: "ask_once"
+  - tool: "InternetTool"
+    level: "ask_once"
+patterns:
+  safe:
+    tool: "ShellTool"
+    level: "safe"
+    matches:
+      - "^pwd\\s"
+      - "^ls\\s"
+      - "^echo\\s"
+      - "^head\\s"
+      - "^tail\\s"
+      - "^wc\\s"
+      - "^diff\\s"
+      - "^sort\\s"
+      - "^uniq\\s"
+  common:
+    tool: "ShellTool"
+    level: "ask_once"
+    matches:
+      - "^cd\\s"
+      - "^cd\\s.*&&"
+      - "^find\\s"
+      - "^cat\\s"
+      - "^grep\\s"
+      - "^chmod\\s"
+      - "^chown\\s"
+      - "^mkdir\\s"
+      - "^touch\\s"
+      - "^tar\\s"
+      - "^zip\\s"
+      - "^unzip\\s"
+      - "^curl\\s"
+      - "^wget\\s"
+  java:
+    tool: "ShellTool"
+    level: "ask_once"
+    matches:
+      - "^mvn\\s"
+      - "^gradle\\s"
+      - "^javac\\s"
+      - "^java\\s"
+      - "^jar\\s"
+  python:
+    tool: "ShellTool"
+    level: "ask_once"
+    matches:
+      - "^pip\\s"
+      - "^python\\s"
+      - "^python3\\s"
+      - "^pyenv\\s"
+      - "^pip3\\s"
+  node:
+    tool: "ShellTool"
+    level: "ask_once"
+    matches:
+      - "^npm\\s"
+      - "^npx\\s"
+      - "^yarn\\s"
+      - "^pnpm\\s"
+      - "^node\\s"
+  typescript:
+    tool: "ShellTool"
+    level: "ask_once"
+    matches:
+      - "^tsc\\s"
+      - "^bun\\s"
+  go:
+    tool: "ShellTool"
+    level: "ask_once"
+    matches:
+      - "^go\\s"
+      - "^gofmt\\s"
+  rust:
+    tool: "ShellTool"
+    level: "ask_once"
+    matches:
+      - "^cargo\\s"
+      - "^rustc\\s"
+      - "^rustup\\s"
+  ruby:
+    tool: "ShellTool"
+    level: "ask_once"
+    matches:
+      - "^bundle\\s"
+      - "^rake\\s"
+      - "^gem\\s"
+      - "^ruby\\s"
+  php:
+    tool: "ShellTool"
+    level: "ask_once"
+    matches:
+      - "^composer\\s"
+      - "^php\\s"
+  dangerous_commands:
+    tool: "ShellTool"
+    level: "dangerous"
+    matches:
+      # Destructive file operations
+      - "rm\\s+-rf"
+      - "rm\\s+-r\\s+/"
+      - "mkfs\\."
+      - "dd\\s+"
+      - "fdisk\\s+"
+      - "format\\s+"
+      - "mkswap\\s+"
+      # Overwrite system files
+      - ">\\s*/etc/"
+      - ">\\s*/boot/"
+      - ">\\s*/dev/"
+      - ">\\s*/proc/"
+      # Permission escalation
+      - "chmod\\s+777\\s+/"
+      - "chown\\s+[^\\s]+\\s+/"
+      - "chmod\\s+-R\\s+777"
+      # Network manipulation
+      - "iptables\\s+"
+      - "ufw\\s+"
+      - "route\\s+"
+      # Process/system control
+      - "killall\\s+"
+      - "pkill\\s+"
+      - "systemctl\\s+(stop|disable|mask)"
+      - "init\\s+"
+      - "shutdown\\s+"
+      - "reboot\\s+"
+      - "poweroff\\s+"
+      # Package manipulation
+      - "apt\\s+(remove|purge|autoremove)"
+      - "dpkg\\s+-r"
+      - "rpm\\s+-e"
+      # Fork bombs
+      - ":\\s*\\{\\s*:\\s*\\|"
+      - "\\|\\s*&\\s*$"
+      # sudo escalation
+      - "sudo\\s+"
+      # Remote code execution (curl|bash, wget|bash)
+      - "curl\\s+.*\\|\\s*(bash|sh)"
+      - "wget\\s+.*\\|\\s*(bash|sh)"
+      # Git destructive operations
+      - "git\\s+push\\s+--force"
+      - "git\\s+reset\\s+--hard\\s+HEAD~"
+      - "git\\s+rebase\\s+--onto"
+      # Environment variable leaks
+      - "export\\s+[A-Z_]+=\\s*\\$"
+      - "printenv\\s+"
+      # Database destruction
+      - "drop\\s+database"
+      - "drop\\s+table"
+      - "truncate\\s+table"
+      - "DELETE\\s+FROM\\s+.*;"

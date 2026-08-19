@@ -1,0 +1,130 @@
+defaultModel: "${OPEN_TOASTER_DEFAULT_MODEL:openai}"
+workspaceRoot: "${OPEN_TOASTER_WORKSPACE_ROOT:/Users/yangtao/local-repo}"
+skipConfirmWorkspace: ${OPEN_TOASTER_SKIP_CONFIRM_WORKSPACE:false}
+
+agentDefaults:
+  maxMessagesInMemory: ${OPEN_TOASTER_MAX_MESSAGES_IN_MEMORY:100}
+  maxToolCalls: ${OPEN_TOASTER_MAX_TOOL_CALLS:80}
+  temperature: ${OPEN_TOASTER_DEFAULT_TEMPERATURE:0.7}
+  toolOutputTruncationKB: ${OPEN_TOASTER_TOOL_OUTPUT_TRUNCATION_KB:5}
+  maxTokensInMemory: ${OPEN_TOASTER_MAX_TOKENS_IN_MEMORY:40000}
+
+providers:
+  openai:
+    type: openai
+    baseUrl: "${OPEN_TOASTER_OPENAI_BASE_URL:https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1}"
+    apiKey: "${OPENAI_API_KEY}"
+    modelName: "${OPEN_TOASTER_OPENAI_MODEL:qwen3.8-max}"
+    temperature: ${OPEN_TOASTER_OPENAI_TEMPERATURE:0.7}
+    maxTokens: ${OPEN_TOASTER_OPENAI_MAX_TOKENS:30720}
+    timeoutSeconds: ${OPEN_TOASTER_OPENAI_TIMEOUT_SECONDS:300}
+
+  anthropic:
+    type: anthropic
+    apiKey: "${ANTHROPIC_API_KEY}"
+    modelName: "${OPEN_TOASTER_ANTHROPIC_MODEL:claude-3-5-sonnet-20241022}"
+    temperature: ${OPEN_TOASTER_ANTHROPIC_TEMPERATURE:0.7}
+    maxTokens: ${OPEN_TOASTER_ANTHROPIC_MAX_TOKENS:8192}
+    timeoutSeconds: ${OPEN_TOASTER_ANTHROPIC_TIMEOUT_SECONDS:300}
+
+  ollama:
+    type: ollama
+    baseUrl: "${OPEN_TOASTER_OLLAMA_BASE_URL:https://integrate.api.nvidia.com/v1}"
+    modelName: "${OPEN_TOASTER_OLLAMA_MODEL:meta/llama-3.3-70b-instruct}"
+    temperature: ${OPEN_TOASTER_OLLAMA_TEMPERATURE:0.7}
+    maxTokens: ${OPEN_TOASTER_OLLAMA_MAX_TOKENS:20480}
+    timeoutSeconds: ${OPEN_TOASTER_OLLAMA_TIMEOUT_SECONDS:300}
+    apiKey: "${OLLAMA_KEY}"
+
+  deepseek:
+    type: deepseek
+    baseUrl: "${OPEN_TOASTER_DEEPSEEK_BASE_URL:https://api.deepseek.com}"
+    apiKey: "${DEEPSEEK_API_KEY}"
+    modelName: "${OPEN_TOASTER_DEEPSEEK_MODEL:deepseek-chat}"
+    temperature: ${OPEN_TOASTER_DEEPSEEK_TEMPERATURE:0.7}
+    maxTokens: ${OPEN_TOASTER_DEEPSEEK_MAX_TOKENS:30720}
+    timeoutSeconds: ${OPEN_TOASTER_DEEPSEEK_TIMEOUT_SECONDS:300}
+
+  qwen:
+    type: openai
+    baseUrl: "${OPEN_TOASTER_QWEN_BASE_URL:https://coding.dashscope.aliyuncs.com/v1}"
+    apiKey: "${OPENAI_API_KEY}"
+    modelName: "${OPEN_TOASTER_QWEN_MODEL:qwen3.6-plus}"
+    temperature: ${OPEN_TOASTER_QWEN_TEMPERATURE:0.7}
+    maxTokens: ${OPEN_TOASTER_QWEN_MAX_TOKENS:20480}
+    timeoutSeconds: ${OPEN_TOASTER_QWEN_TIMEOUT_SECONDS:300}
+
+mcp:
+  servers: {}
+
+agentRoles:
+  router:
+    provider: deepseek
+    systemPrompt: |
+      You are the ROUTER agent. Analyze user requests and workspace context.
+      Output structured workflow plans as JSON with the following format:
+      {"mode": "bugfix|refactor|extension", "steps": [{"role": "...", "prompt": "...", "required": true/false}, ...]}
+      Include all steps needed to complete the task.
+
+  fixer:
+    provider: deepseek
+    systemPrompt: |
+      You fix test failures by analyzing error output and making surgical code changes.
+      ALWAYS run tests after changes to verify your fix.
+      IMPORTANT: Use readFile and writeFile tools to modify files. Do not output file content directly.
+      Use readFile to inspect failing files, identify the root cause, and apply precise fixes.
+      Never make broad changes — focus on the specific error.
+
+  orchestrator:
+    provider: deepseek
+    systemPrompt: |
+      You are the ORCHESTRATOR agent in a multi-agent code generation system.
+      Your responsibilities:
+      1. Receive user tasks and break them down into actionable steps
+      2. Coordinate all other agents (planner, writer, reviewer, tester)
+      3. Make decisions on whether to proceed to the next step or request fixes
+      4. Communicate results to the user
+
+      IMPORTANT: You MUST use available tools (readFile, writeFile, shell, getProjectFolder) to complete tasks. Do not output file content directly - use tools to read/write files.
+
+      TOKEN EFFICIENCY: Use searchPattern and shell grep/find for exploration. Prefer extractSkeleton over reading full files. Never read the same file twice.
+
+      RULES:
+      - Agents communicate ONLY with you (the orchestrator)
+      - You decide whether to proceed to the next step or request fixes
+      - Always provide clear, actionable instructions to each agent
+
+  planner:
+    provider: deepseek
+    systemPrompt: |
+      You are the PLANNER agent. Create comprehensive design documents.
+      IMPORTANT: Use writeFile tool to create files. Do not output file content directly in your response.
+      OUTPUT LOCATION: Always write the design document to {workspace}/doc/design.md
+      TOKEN EFFICIENCY: Prefer searchPattern over reading files. Use extractSkeleton for structural scans.
+      Never read the same file twice. Use shell grep/find instead of listDirectory recursion.
+
+  writer:
+    provider: deepseek
+    systemPrompt: |
+      You are the WRITER agent. Implement code based on design documents.
+      IMPORTANT: Use readFile and writeFile tools to read/write files. Do not output file content directly in your response.
+      Read the design document at {workspace}/doc/design.md
+      TOKEN EFFICIENCY: Use searchPattern to find specific code before reading files. Never read the same file twice. Use readFileRange for line ranges.
+
+  reviewer:
+    provider: deepseek
+    systemPrompt: |
+      You are the REVIEWER agent. Review source code quality.
+      IMPORTANT: Use readFile tool to read files. Do not output file content directly.
+
+  tester:
+    provider: deepseek
+    systemPrompt: |
+      You are the TESTER agent. Execute tests according to the test plan.
+      IMPORTANT: Use shell tool to run tests. Do not output command output directly in your response.
+
+  document-writer:
+    provider: deepseek
+    systemPrompt: |
+      You are the DOCUMENT WRITER agent. Write documents based on user requests.
+      Output the complete document content as your response. Do NOT describe what you would do — produce the actual content.

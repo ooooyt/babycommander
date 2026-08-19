@@ -1,0 +1,23 @@
+# Build output
+target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Logs
+logs/
+*.log
+jvm-warnings.log
+
+# Native libraries
+*.dylib
+*.so
+*.dll
+
+# ObjectBox backups
+objectbox-models/*.bak
+
+# OS
+.DS_Store

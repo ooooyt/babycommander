@@ -1,0 +1,386 @@
+{
+  "_note1": "KEEP THIS FILE! Check it into a version control system (VCS) like git.",
+  "_note2": "ObjectBox manages crucial IDs for your object model. See docs for details.",
+  "_note3": "If you have VCS merge conflicts, you must resolve them according to ObjectBox docs.",
+  "entities": [
+    {
+      "id": "1:473618192751113878",
+      "lastPropertyId": "8:4428400749035931235",
+      "name": "ConversationEntity",
+      "properties": [
+        {
+          "id": "1:112757142275655736",
+          "name": "objectBoxId",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:3082790768968022586",
+          "name": "id",
+          "indexId": "1:6387634596435559883",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "3:5045419602729460655",
+          "name": "sessionId",
+          "indexId": "2:2142274513186901191",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "4:3473088370483225371",
+          "name": "workspace",
+          "type": 9
+        },
+        {
+          "id": "5:9164605544279830281",
+          "name": "agentRole",
+          "type": 9
+        },
+        {
+          "id": "6:6480001641706415613",
+          "name": "provider",
+          "type": 9
+        },
+        {
+          "id": "7:3707492354810486340",
+          "name": "createdAt",
+          "type": 6
+        },
+        {
+          "id": "8:4428400749035931235",
+          "name": "updatedAt",
+          "type": 6
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "2:8063545806771573833",
+      "lastPropertyId": "11:7384478291543075312",
+      "name": "MessageEntity",
+      "properties": [
+        {
+          "id": "1:3279003666966460448",
+          "name": "objectBoxId",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:2616600272989241537",
+          "name": "id",
+          "indexId": "3:3053783390062506770",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "3:802575644318702755",
+          "name": "conversationId",
+          "indexId": "4:796626173849271664",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "4:8383106783086164301",
+          "name": "sequenceNumber",
+          "type": 5
+        },
+        {
+          "id": "5:8995463458683018458",
+          "name": "role",
+          "type": 9
+        },
+        {
+          "id": "6:3453405781159842811",
+          "name": "content",
+          "type": 9
+        },
+        {
+          "id": "7:1026937617820142597",
+          "name": "toolCallsJson",
+          "type": 9
+        },
+        {
+          "id": "8:1805319718289804148",
+          "name": "toolCallExecutionJson",
+          "type": 9
+        },
+        {
+          "id": "9:7735654823940667355",
+          "name": "timestamp",
+          "type": 6
+        },
+        {
+          "id": "10:7717325268935771462",
+          "name": "summarized",
+          "type": 1
+        },
+        {
+          "id": "11:7384478291543075312",
+          "name": "tokenCount",
+          "type": 5
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "3:5607283123353630636",
+      "lastPropertyId": "7:8086227617774347200",
+      "name": "ProjectEntity",
+      "properties": [
+        {
+          "id": "1:742251850721364954",
+          "name": "objectBoxId",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:5280581751772623177",
+          "name": "id",
+          "indexId": "5:1820665444069513977",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "3:2435696890798823957",
+          "name": "name",
+          "type": 9
+        },
+        {
+          "id": "4:3472845757145882812",
+          "name": "path",
+          "type": 9
+        },
+        {
+          "id": "5:7581210818506823166",
+          "name": "languages",
+          "type": 9
+        },
+        {
+          "id": "6:1213049302561544679",
+          "name": "createdDatetime",
+          "type": 6
+        },
+        {
+          "id": "7:8086227617774347200",
+          "name": "active",
+          "type": 1
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "4:4895009890949233517",
+      "lastPropertyId": "8:3999121735271458383",
+      "name": "SummaryEntity",
+      "properties": [
+        {
+          "id": "1:2138001289844136819",
+          "name": "objectBoxId",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:4827628136613366257",
+          "name": "id",
+          "indexId": "6:2957205702613719430",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "3:1767628305011758518",
+          "name": "conversationId",
+          "indexId": "7:6231733746668579303",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "4:2312906687748901031",
+          "name": "messageRangeStart",
+          "type": 5
+        },
+        {
+          "id": "5:7745320156690540088",
+          "name": "messageRangeEnd",
+          "type": 5
+        },
+        {
+          "id": "6:2558327457641488013",
+          "name": "summaryText",
+          "type": 9
+        },
+        {
+          "id": "7:7289479702426380505",
+          "name": "createdAt",
+          "type": 6
+        },
+        {
+          "id": "8:3999121735271458383",
+          "name": "messageCount",
+          "type": 5
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "5:1638744930080264562",
+      "lastPropertyId": "8:6008765599292662561",
+      "name": "TaskEntity",
+      "properties": [
+        {
+          "id": "1:3866144081563258763",
+          "name": "objectBoxId",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:6164460939184515134",
+          "name": "id",
+          "indexId": "8:6524537854458409620",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "3:410783139060634865",
+          "name": "projectId",
+          "indexId": "9:7205723009189179855",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "4:8198239087639392637",
+          "name": "name",
+          "type": 9
+        },
+        {
+          "id": "5:95830032936617019",
+          "name": "createdDatetime",
+          "type": 6
+        },
+        {
+          "id": "6:7681409215823626631",
+          "name": "status",
+          "type": 9
+        },
+        {
+          "id": "7:429467680576436729",
+          "name": "updatedDatetime",
+          "type": 6
+        },
+        {
+          "id": "8:6008765599292662561",
+          "name": "embedding",
+          "indexId": "12:7427856260250042318",
+          "type": 28,
+          "flags": 8
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "6:4643646153661852444",
+      "lastPropertyId": "6:4833684420779931267",
+      "name": "TaskToolExecutionEntity",
+      "properties": [
+        {
+          "id": "1:2264597143603635791",
+          "name": "objectBoxId",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:4613247403465275390",
+          "name": "id",
+          "indexId": "10:1042257199129686631",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "3:4782736582770383107",
+          "name": "taskId",
+          "indexId": "11:340522881752210436",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "4:6448578163345322072",
+          "name": "toolInfo",
+          "type": 9
+        },
+        {
+          "id": "5:7258277128330806238",
+          "name": "status",
+          "type": 9
+        },
+        {
+          "id": "6:4833684420779931267",
+          "name": "updatedDatetime",
+          "type": 6
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "7:7789907923516242709",
+      "lastPropertyId": "7:4880652287385750401",
+      "name": "HookAnswerEntity",
+      "properties": [
+        {
+          "id": "1:1033970945239124688",
+          "name": "objectBoxId",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:3279324402522748088",
+          "name": "sessionId",
+          "indexId": "13:8966567421198406825",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "3:2218469312517316049",
+          "name": "toolName",
+          "indexId": "14:3957296106248545080",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "4:4550727839341602904",
+          "name": "methodName",
+          "indexId": "15:1732300581180433374",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "5:6709097099458895964",
+          "name": "argsSignature",
+          "type": 9
+        },
+        {
+          "id": "6:7895944138222556592",
+          "name": "answerType",
+          "type": 9
+        },
+        {
+          "id": "7:4880652287385750401",
+          "name": "createdDatetime",
+          "type": 6
+        }
+      ],
+      "relations": []
+    }
+  ],
+  "lastEntityId": "7:7789907923516242709",
+  "lastIndexId": "15:1732300581180433374",
+  "lastRelationId": "0:0",
+  "lastSequenceId": "0:0",
+  "modelVersion": 5,
+  "modelVersionParserMinimum": 5,
+  "retiredEntityUids": [],
+  "retiredIndexUids": [],
+  "retiredPropertyUids": [],
+  "retiredRelationUids": [],
+  "version": 1
+}
