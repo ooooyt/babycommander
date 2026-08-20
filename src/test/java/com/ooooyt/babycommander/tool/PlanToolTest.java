@@ -315,4 +315,42 @@ class PlanToolTest {
         assertEquals("Same (3)", phases.get(2).title());
     }
 
+    @Test
+    void testCreatePlan_StringifiedJsonArrayTitleIsExpanded() {
+        String json = "[{\"title\": \"Scan project structure\", \"description\": \"Find files\"}, "
+            + "{\"title\": \"Locate parsing logic\", \"description\": \"Identify parser\"}]";
+        PlanTool.PhaseInput[] inputs = new PlanTool.PhaseInput[]{
+            new PlanTool.PhaseInput(json, null)
+        };
+        planTool.createPlan("Task", inputs);
+        List<UiEvent.Phase> phases = planTool.getPhases();
+        assertEquals(2, phases.size());
+        assertEquals("Scan project structure", phases.get(0).title());
+        assertEquals("Find files", phases.get(0).description());
+        assertEquals("Locate parsing logic", phases.get(1).title());
+    }
+
+    @Test
+    void testCreatePlan_StringifiedJsonObjectTitleIsUsed() {
+        String json = "{\"title\": \"Explore structure\", \"description\": \"Overview\"}";
+        PlanTool.PhaseInput[] inputs = new PlanTool.PhaseInput[]{
+            new PlanTool.PhaseInput(json, null)
+        };
+        planTool.createPlan("Task", inputs);
+        List<UiEvent.Phase> phases = planTool.getPhases();
+        assertEquals(1, phases.size());
+        assertEquals("Explore structure", phases.get(0).title());
+        assertEquals("Overview", phases.get(0).description());
+    }
+
+    @Test
+    void testCreatePlan_UnparseableJsonTitleKeptAsIs() {
+        PlanTool.PhaseInput[] inputs = new PlanTool.PhaseInput[]{
+            new PlanTool.PhaseInput("[{\"title\": \"broken", null)
+        };
+        planTool.createPlan("Task", inputs);
+        List<UiEvent.Phase> phases = planTool.getPhases();
+        assertEquals(1, phases.size());
+    }
+
 }

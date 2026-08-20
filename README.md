@@ -1,6 +1,6 @@
-# babycommander
+# Baby Commander
 
-An AI-powered coding assistant that runs in your terminal. babycommander combines a
+An AI-powered coding assistant that runs in your terminal. Baby Commander combines a
 multi-agent LLM orchestration engine with a rich terminal UI, letting you generate,
 modify, refactor, debug, and document code projects through natural-language chat.
 
@@ -23,13 +23,16 @@ Built with **Java 21+**, **Quarkus**, and **LangChain4j**.
   - Falls back to a single-agent conversational mode when intent is inconclusive.
 - **Plan-first execution** — agents create a numbered plan (`createPlan`) before
   acting and report phase completion, keeping long tasks transparent and resumable.
+  Plan tool output is validated and normalized (including self-healing of
+  malformed LLM JSON), so phases always render as readable titles.
 - **Rich toolset for agents** — file read/write/range-read, line & unified-diff
   patching, directory listing, text search, skeleton extraction (ANTLR-based),
   function-body lookup, shell execution, internet fetch, user prompts, and more.
 - **Skill workflows** — reusable multi-agent playbooks defined in `SKILL.md`
-  files (Claude Code / OpenCode compatible format). Bundled skills:
-  `create-large-project`, `refactor-large-codebase`, `migrate-project`,
-  `add-complex-feature`.
+  files (Claude Code / OpenCode compatible format). Bundled skill:
+  `refactor-large-codebase` (others such as `create-large-project`,
+  `migrate-project`, and `add-complex-feature` can be registered per the
+  *Skills* section).
 - **Safety hooks** — configurable allow/ask/deny rules for tool calls
   (`hooks.yaml`): read-only shell commands run silently, build commands ask once,
   destructive commands (`rm -rf`, `sudo`, `DROP TABLE`, force-push, …) are blocked
@@ -39,45 +42,12 @@ Built with **Java 21+**, **Quarkus**, and **LangChain4j**.
   planner, writer, fixer, …).
 - **Persistent memory** — conversations, messages, tasks, tool executions, and
   summaries stored locally in an embedded **ObjectBox** database
-  (`~/.babycommander/db/objectbox`), with automatic conversation compaction.
+  (`~/.babycommander/db/objectbox`), with automatic conversation compaction and
+  summarization.
 - **MCP support** — connect external Model Context Protocol servers via config.
 - **i18n** — English and Simplified Chinese UI messages (`/lang` to switch).
 - **REST status endpoint** — `GET /api/status` for monitoring task progress.
 
-## Architecture
-
-```
-src/main/java/com/ooooyt/babycommander/
-├── CodeGenApp / CodeGenLifecycle   # Quarkus entry point, TUI bootstrap
-├── CodeGenResource                 # REST API (/api/status)
-├── agent/                          # Agent factory, chat models, token usage,
-│   └── memory/                     #   chat memory + summarization/compaction
-├── config/                         # agents.yaml loading (AgentConfig)
-├── db/                             # ObjectBox store, entities, repositories,
-│   ├── entity/                     #   chat-memory persistence
-│   └── repository/
-├── editloop/                       # Iterative edit/verify loop
-├── hook/                           # Tool-call safety rules (hooks.yaml)
-├── intent/                         # Intent detection & complexity routing
-├── orchestrator/                   # Orchestrator + per-mode strategies
-│                                   #   (bugfix/refactor/extension/create/document),
-│                                   #   skill workflow executor, test runner
-├── service/                        # Project/task services, embeddings
-├── skill/                          # SKILL.md loader, registry, workflow steps
-├── status/                         # Status events (console + REST trackers)
-├── tool/                           # FileSystemTool, ShellTool, InternetTool,
-│   └── mcp/                        #   PlanTool, AskUserTool, MCP adapters
-├── ui/                             # ChatEngine (event-bus driven)
-│   ├── engine/                     #   session/command/request handlers
-│   └── tui/                        #   JLine terminal UI, Markdown renderer,
-│                                   #   slash commands, themes
-├── util/                           # Skeleton extractor, patch utils, token
-│                                   #   counter, i18n, project scanner
-└── workflow/                       # Generic workflow engine & steps
-```
-
-Key flow: **TUI → ChatEngine → Orchestrator → mode strategy / skill workflow →
-agents (LangChain4j) → tools → status events → TUI/REST**.
 
 ## Requirements
 
@@ -101,6 +71,10 @@ java -jar target/quarkus-app/quarkus-run.jar
 
 > The Quarkus build passes JVM args required by ObjectBox:
 > `--add-opens=java.base/sun.misc=ALL-UNNAMED --enable-native-access=ALL-UNNAMED`.
+
+![Baby Commander TUI](docs/images/tui.png)
+
+> *Screenshot of the Baby Commander terminal UI.*
 
 ## Configuration
 
@@ -146,7 +120,7 @@ Custom rules and patterns can be added under `rules:` and `patterns:`.
 
 Drop a `SKILL.md` file into `~/.babycommander/skills/<skill-name>/` (or the
 configured `skillsDir`) to register a custom multi-agent workflow. See
-`src/main/resources/skills/example/SKILL.md` for the format.
+`src/main/resources/skills/refactor-large-codebase/SKILL.md` for the format.
 
 ## Usage
 
@@ -185,7 +159,8 @@ mvn verify -DskipITs=false
 ```
 
 Notable test areas: orchestrator strategies, edit loop, intent/complexity routing,
-skill loading, TUI rendering, hook rules, chat memory compaction.
+skill loading, TUI rendering, hook rules, chat memory compaction, tool
+execution/plan normalization.
 
 ### Generated sources
 
@@ -199,13 +174,14 @@ skill loading, TUI rendering, hook rules, chat memory compaction.
 ```
 babycommander/
 ├── pom.xml                  # Quarkus + LangChain4j + ObjectBox + ANTLR build
-├── src/main/java/…          # Application sources (see Architecture)
 ├── src/main/antlr4/         # Code-skeleton grammar
+├── src/main/java/…          # Application sources (see Architecture)
 ├── src/main/resources/
 │   ├── agents.yaml          # Agent/provider configuration
 │   ├── hooks.yaml           # Tool safety rules
 │   ├── i18n/                # messages_en / messages_zh bundles
 │   └── skills/              # Bundled SKILL.md workflows
 ├── src/test/java/…          # Unit tests
+├── src/test/resources/      # Test config (application.properties)
 └── objectbox-models/        # ObjectBox data model
 ```

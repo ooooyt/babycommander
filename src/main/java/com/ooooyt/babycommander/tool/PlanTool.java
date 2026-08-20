@@ -4,6 +4,8 @@ import com.ooooyt.babycommander.ui.UiEvent;
 import com.ooooyt.babycommander.util.I18n;
 import com.ooooyt.babycommander.util.MessageKey;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.agent.tool.Tool;
 import io.quarkus.logging.Log;
 import io.vertx.mutiny.core.eventbus.EventBus;
@@ -14,6 +16,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class PlanTool {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     /**
      * Structured input for a plan phase: a brief title (max 10 words) and an
@@ -94,9 +98,16 @@ public class PlanTool {
         Log.infof("PlanTool.createPlan called: task='%s', %d phases", task, phases.length);
         latestTask.set(task != null ? task : "");
         this.phases.clear();
-        for (int i = 0; i < phases.length; i++) {
+
+        // Normalize the LLM-supplied phases. LLMs occasionally emit a single phase whose
+        // title is the stringified JSON of the whole array (e.g. when they fail to follow
+        // the nested PhaseInput[] schema). Detect and expand/sanitize those so the left
+        // panel shows real titles instead of raw JSON.
+        List<PhaseInput> normalized = normalizePhases(phases);
+
+        for (int i = 0; i < normalized.size(); i++) {
             String status = i == 0 ? "active" : "pending";
-            PhaseInput input = phases[i];
+            PhaseInput input = normalized.get(i);
             String title = truncateToWords(input.title(), MAX_TITLE_WORDS);
             String desc = truncateToWords(input.description(), MAX_DESCRIPTION_WORDS);
             if (desc == null || desc.isBlank()) {
@@ -107,7 +118,7 @@ public class PlanTool {
         // Enforce title uniqueness within the task (disambiguate duplicates by index).
         enforceUniqueTitles();
         publishUpdate();
-        return I18n.tr(MessageKey.PLAN_CREATED, phases.length);
+        return I18n.tr(MessageKey.PLAN_CREATED, normalized.size());
     }
 
     /**
@@ -120,6 +131,78 @@ public class PlanTool {
             inputs[i] = new PhaseInput(phases[i]);
         }
         return createPlan(task, inputs);
+    }
+
+    /**
+     * Repairs LLM-supplied phases that arrive with stringified JSON in the title.
+     *
+     * <p>When an LLM fails to follow the structured {@link PhaseInput} array schema it
+     * sometimes emits a single phase whose {@code title} (or {@code description}) is the
+     * raw JSON of the intended phases array, e.g.:
+     * <pre>
+     *   [{"title": "Scan project structure", "description": "..."}, ...]
+     * </pre>
+     * This method detects such values, parses them, and expands them into real phases so
+     * the plan panel shows titles instead of raw JSON. Values that parse cleanly are kept
+     * as-is; unparseable JSON is passed through unchanged.
+     */
+    private static List<PhaseInput> normalizePhases(PhaseInput[] phases) {
+        List<PhaseInput> result = new ArrayList<>();
+        if (phases == null) {
+            return result;
+        }
+        for (PhaseInput input : phases) {
+            String title = input != null ? input.title() : null;
+            String desc = input != null ? input.description() : null;
+            String candidate = (title != null && looksLikeJson(title)) ? title
+                    : (desc != null && looksLikeJson(desc)) ? desc : null;
+
+            if (candidate == null) {
+                result.add(input);
+                continue;
+            }
+
+            JsonNode node;
+            try {
+                node = MAPPER.readTree(candidate);
+            } catch (Exception e) {
+                // Not actually parseable JSON — keep the original phase untouched.
+                result.add(input);
+                continue;
+            }
+
+            if (node != null && node.isArray()) {
+                // The whole phases array was embedded as a string: expand it.
+                for (JsonNode element : node) {
+                    result.add(phaseFromJson(element));
+                }
+            } else if (node != null && node.isObject()) {
+                // A single phase object was embedded as a string: use it.
+                result.add(phaseFromJson(node));
+            } else {
+                result.add(input);
+            }
+        }
+        return result;
+    }
+
+    /** Builds a {@link PhaseInput} from a JSON object node, falling back to the node text. */
+    private static PhaseInput phaseFromJson(JsonNode node) {
+        if (node.isObject()) {
+            String t = node.hasNonNull("title") ? node.get("title").asText() : node.asText();
+            String d = node.hasNonNull("description") ? node.get("description").asText() : null;
+            return new PhaseInput(t, d);
+        }
+        return new PhaseInput(node.asText());
+    }
+
+    /** True when the string looks like it begins with a JSON array or object. */
+    private static boolean looksLikeJson(String text) {
+        if (text == null) {
+            return false;
+        }
+        String trimmed = text.trim();
+        return trimmed.startsWith("[") || trimmed.startsWith("{");
     }
 
     /** Truncate a string to at most {@code maxWords} words. Returns null for null input. */
