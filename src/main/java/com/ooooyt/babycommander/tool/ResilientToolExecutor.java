@@ -51,6 +51,23 @@ public class ResilientToolExecutor implements ToolExecutor {
 
     @Override
     public String execute(ToolExecutionRequest request, Object memoryId) {
+        // Every tool call (with complete arguments and complete result) is
+        // recorded to the dedicated tool-calls log file for debugging.
+        long start = System.currentTimeMillis();
+        String result;
+        try {
+            result = executeInternal(request, memoryId);
+        } catch (RuntimeException e) {
+            ToolCallLogger.log(request.name(), request.arguments(),
+                    "EXCEPTION: " + e, System.currentTimeMillis() - start);
+            throw e;
+        }
+        ToolCallLogger.log(request.name(), request.arguments(), result,
+                System.currentTimeMillis() - start);
+        return result;
+    }
+
+    private String executeInternal(ToolExecutionRequest request, Object memoryId) {
         // Try to parse the arguments as-is; if valid, delegate without touching them.
         if (isValidJson(request.arguments())) {
             return executeSafely(request, memoryId);
