@@ -4,11 +4,13 @@ import com.ooooyt.babycommander.db.entity.ProjectEntity;
 import com.ooooyt.babycommander.db.entity.TaskEntity;
 import com.ooooyt.babycommander.service.ProjectTaskService;
 import com.ooooyt.babycommander.tool.PlanTool;
+import com.ooooyt.babycommander.tool.TaskContext;
 import io.quarkus.logging.Log;
 import io.vertx.mutiny.core.eventbus.EventBus;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -23,6 +25,8 @@ import java.util.List;
  *       current project. (CREATE)</li>
  *   <li>On every subsequent {@code PlanUpdate} event, it updates the task
  *       record to reflect the latest phase statuses. (UPDATE)</li>
+ *   <li>Individual phases are persisted alongside the task, and their statuses
+ *       are updated as the plan progresses.</li>
  *   <li>When all phases are completed → status {@code COMPLETED}.</li>
  *   <li>When any phase has failed → status {@code FAILED}.</li>
  *   <li>Otherwise → status remains {@code STARTED} (updatedDatetime refreshed).</li>
@@ -58,6 +62,16 @@ public class TaskPersistenceConsumer {
     private volatile String taskName;
 
     /**
+     * Whether phases have been persisted for the current task. Used to decide
+     * between a full replace (first snapshot / plan change) and incremental
+     * status updates on subsequent events.
+     */
+    private volatile boolean phasesInitialized;
+
+    /** The number of phases last persisted, to detect plan changes. */
+    private volatile int persistedPhaseCount;
+
+    /**
      * Registers the event bus consumer. Must be called after {@code projectFolder}
      * has been set.
      */
@@ -65,6 +79,8 @@ public class TaskPersistenceConsumer {
         this.projectFolder = projectFolder;
         this.taskId = null;
         this.taskName = null;
+        this.phasesInitialized = false;
+        this.persistedPhaseCount = 0;
 
         eventBus.consumer(UI_EVENT_ADDRESS, message -> {
             if (message.body() instanceof UiEvent.PlanUpdate update) {
@@ -86,6 +102,9 @@ public class TaskPersistenceConsumer {
     public void resetTaskId() {
         this.taskId = null;
         this.taskName = null;
+        this.phasesInitialized = false;
+        this.persistedPhaseCount = 0;
+        TaskContext.clear();
     }
 
     private void onPlanUpdate(UiEvent.PlanUpdate update) {
@@ -118,6 +137,7 @@ public class TaskPersistenceConsumer {
                 TaskEntity task = projectTaskService.createTask(project.id, taskName);
                 taskId = task.id;
                 this.taskName = taskName;
+                TaskContext.setCurrentTaskId(taskId);
                 Log.infof("TaskPersistenceConsumer: created task '%s' (id=%s) for project '%s'",
                     taskName, taskId, project.name);
             } catch (Exception e) {
@@ -142,6 +162,9 @@ public class TaskPersistenceConsumer {
                     taskId, newTaskName, e.getMessage());
             }
         }
+
+        // ── PHASES: Persist phases and update their statuses ─────────────
+        persistPhases(taskId, phases);
 
         // ── UPDATE: Check for terminal states ────────────────────────────
         boolean allCompleted = true;
@@ -184,6 +207,39 @@ public class TaskPersistenceConsumer {
                 Log.errorf("TaskPersistenceConsumer: failed to update task %s: %s",
                     taskId, e.getMessage());
             }
+        }
+    }
+
+    /**
+     * Persists the given phases for the task.
+     * <p>
+     * On the first snapshot, or whenever the number of phases changes (e.g. the
+     * placeholder plan is replaced by the LLM's real plan), the phase set is
+     * fully replaced. Otherwise only phase statuses are updated incrementally.
+     *
+     * @param taskId the task business ID
+     * @param phases the phase snapshot from the PlanUpdate event
+     */
+    private void persistPhases(String taskId, List<UiEvent.Phase> phases) {
+        try {
+            if (!phasesInitialized || phases.size() != persistedPhaseCount) {
+                List<ProjectTaskService.PhaseData> data = new ArrayList<>();
+                for (UiEvent.Phase phase : phases) {
+                    data.add(new ProjectTaskService.PhaseData(
+                        phase.title(), phase.description(), phase.status()));
+                }
+                projectTaskService.replacePhases(taskId, data);
+                phasesInitialized = true;
+                persistedPhaseCount = phases.size();
+                Log.debugf("TaskPersistenceConsumer: persisted %d phases for task %s", phases.size(), taskId);
+            } else {
+                for (int i = 0; i < phases.size(); i++) {
+                    projectTaskService.updatePhaseStatus(taskId, i, phases.get(i).status());
+                }
+            }
+        } catch (Exception e) {
+            Log.errorf("TaskPersistenceConsumer: failed to persist phases for task %s: %s",
+                taskId, e.getMessage());
         }
     }
 }

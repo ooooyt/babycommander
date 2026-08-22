@@ -3,6 +3,8 @@ package com.ooooyt.babycommander.tool;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
+import com.ooooyt.babycommander.db.entity.TaskToolExecutionEntity;
+import com.ooooyt.babycommander.service.ProjectTaskService;
 import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.service.tool.DefaultToolExecutor;
 import dev.langchain4j.service.tool.ToolExecutor;
@@ -33,20 +35,47 @@ import io.quarkus.logging.Log;
  * <p>In both cases the default executor would otherwise abort the entire agent
  * session. By returning an error string (the tool-result channel) instead of
  * throwing, the agent loop can continue and let the model self-correct.</p>
+ *
+ * <p>When a {@link ProjectTaskService} is available and a current task is active
+ * (see {@link TaskContext}), every tool call is also persisted to the database as
+ * a {@link TaskToolExecutionEntity}. The tool name is stored verbatim (never
+ * truncated, since it is important for accurate attribution), while the arguments
+ * and result are truncated to {@link #MAX_STORED_FIELD_LENGTH} characters.</p>
  */
 public class ResilientToolExecutor implements ToolExecutor {
+
+    /** Maximum length of stored tool-arguments/result fields (tool name is not truncated). */
+    static final int MAX_STORED_FIELD_LENGTH = 200;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final ToolExecutor delegate;
 
+    /** Optional service used to persist tool executions; null when unavailable. */
+    private final ProjectTaskService projectTaskService;
+
     /**
      * Builds a resilient executor for the given tool instance and the request
      * that produced it. The delegate is a {@link DefaultToolExecutor} bound to
      * the same request so tool execution semantics are unchanged.
+     * <p>
+     * Tool execution persistence is disabled (no {@link ProjectTaskService}).
      */
     public ResilientToolExecutor(Object tool, ToolExecutionRequest request) {
+        this(tool, request, null);
+    }
+
+    /**
+     * Builds a resilient executor with optional tool-execution persistence.
+     *
+     * @param tool                 the tool instance
+     * @param request              the request that produced the tool
+     * @param projectTaskService   service used to persist tool executions, or null to disable
+     */
+    public ResilientToolExecutor(Object tool, ToolExecutionRequest request,
+                                 ProjectTaskService projectTaskService) {
         this.delegate = new DefaultToolExecutor(tool, request);
+        this.projectTaskService = projectTaskService;
     }
 
     @Override
@@ -54,17 +83,86 @@ public class ResilientToolExecutor implements ToolExecutor {
         // Every tool call (with complete arguments and complete result) is
         // recorded to the dedicated tool-calls log file for debugging.
         long start = System.currentTimeMillis();
+
+        // Persist the tool execution (STARTED) if a task is active and a service
+        // is available. The tool name is never truncated.
+        String executionId = recordStart(request);
+
         String result;
         try {
             result = executeInternal(request, memoryId);
         } catch (RuntimeException e) {
             ToolCallLogger.log(request.name(), request.arguments(),
                     "EXCEPTION: " + e, System.currentTimeMillis() - start);
+            recordEnd(executionId, request.name(), "EXCEPTION: " + e,
+                    TaskToolExecutionEntity.Status.FAILED);
             throw e;
         }
         ToolCallLogger.log(request.name(), request.arguments(), result,
                 System.currentTimeMillis() - start);
+        recordEnd(executionId, request.name(), result,
+                TaskToolExecutionEntity.Status.COMPLETED);
         return result;
+    }
+
+    /**
+     * Creates a STARTED tool-execution record for the given tool call, returning
+     * its business ID (or null if persistence is disabled or no task is active).
+     */
+    private String recordStart(ToolExecutionRequest request) {
+        if (projectTaskService == null) {
+            return null;
+        }
+        String taskId = TaskContext.getCurrentTaskId();
+        if (taskId == null || taskId.isBlank()) {
+            return null;
+        }
+        try {
+            String toolInfo = buildToolInfo(request.name(), request.arguments(), null);
+            return projectTaskService.createToolExecution(taskId, toolInfo).id;
+        } catch (Exception e) {
+            Log.debugf("ResilientToolExecutor: failed to record tool execution start: %s", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Updates a tool-execution record to its final status and result.
+     */
+    private void recordEnd(String executionId, String toolName, String result,
+                           TaskToolExecutionEntity.Status status) {
+        if (executionId == null || projectTaskService == null) {
+            return;
+        }
+        try {
+            String toolInfo = buildToolInfo(toolName, null, result);
+            projectTaskService.updateToolExecution(executionId, toolInfo, status);
+        } catch (Exception e) {
+            Log.debugf("ResilientToolExecutor: failed to record tool execution end: %s", e.getMessage());
+        }
+    }
+
+    /**
+     * Builds the stored {@code toolInfo} string. The tool name is stored verbatim;
+     * the arguments and result are truncated to {@link #MAX_STORED_FIELD_LENGTH}.
+     */
+    private static String buildToolInfo(String toolName, String arguments, String result) {
+        StringBuilder sb = new StringBuilder("tool=").append(toolName);
+        if (arguments != null) {
+            sb.append(" args=").append(truncate(arguments));
+        }
+        if (result != null) {
+            sb.append(" result=").append(truncate(result));
+        }
+        return sb.toString();
+    }
+
+    /** Truncates the given string to {@link #MAX_STORED_FIELD_LENGTH} characters. */
+    private static String truncate(String value) {
+        if (value == null || value.length() <= MAX_STORED_FIELD_LENGTH) {
+            return value;
+        }
+        return value.substring(0, MAX_STORED_FIELD_LENGTH);
     }
 
     private String executeInternal(ToolExecutionRequest request, Object memoryId) {
@@ -139,7 +237,7 @@ public class ResilientToolExecutor implements ToolExecutor {
         }
     }
 
-    private static boolean isValidJson(String json) {
+    private boolean isValidJson(String json) {
         if (json == null || json.isBlank()) {
             return true;
         }
@@ -151,127 +249,19 @@ public class ResilientToolExecutor implements ToolExecutor {
         }
     }
 
-    /**
-     * Repairs common, well-defined JSON syntax errors produced by LLMs:
-     * <ul>
-     *   <li>missing commas between array/object entries (e.g. {@code ["a" "b"]})</li>
-     *   <li>trailing commas before a closing bracket</li>
-     * </ul>
-     * Returns the repaired JSON string, or {@code null} if it cannot be repaired.
-     */
-    private static String repairJson(String json) {
-        if (json == null || json.isBlank()) {
-            return json;
-        }
-        String candidate = fixMissingCommas(json);
-        if (candidate == null) {
+    private String repairJson(String json) {
+        // Simple heuristic repairs for common LLM JSON mistakes:
+        // 1. Missing comma between array/object elements.
+        // 2. Trailing comma before closing bracket.
+        if (json == null) {
             return null;
         }
-        candidate = removeTrailingCommas(candidate);
-        return candidate;
-    }
-
-    /**
-     * Inserts a comma where two values are adjacent inside an array or object
-     * without a separating comma. This is done by scanning for a value that
-     * terminates with a closing quote ({@code "}), {@code ]}, or {@code }} and
-     * is immediately followed (ignoring whitespace) by the start of another
-     * value ({@code "}, {@code [}, or {@code {}) — but not when the trailing
-     * quote is an object key (followed by {@code :}).
-     */
-    private static String fixMissingCommas(String json) {
-        StringBuilder sb = new StringBuilder(json.length() + 16);
-        boolean inString = false;
-        boolean escaped = false;
-        for (int i = 0; i < json.length(); i++) {
-            char c = json.charAt(i);
-            if (inString) {
-                sb.append(c);
-                if (escaped) {
-                    escaped = false;
-                } else if (c == '\\') {
-                    escaped = true;
-                } else if (c == '"') {
-                    inString = false;
-                    // A string just closed. If the next non-whitespace char is the
-                    // start of another value (not a key separator ':' and not a
-                    // comma/closing bracket), a separating comma is missing.
-                    int j = i + 1;
-                    while (j < json.length() && Character.isWhitespace(json.charAt(j))) {
-                        j++;
-                    }
-                    if (j < json.length()) {
-                        char next = json.charAt(j);
-                        if (next == '"' || next == '[' || next == '{') {
-                            sb.append(',');
-                        }
-                    }
-                }
-                continue;
-            }
-            if (c == '"') {
-                inString = true;
-                sb.append(c);
-                continue;
-            }
-            sb.append(c);
-            if (c == ']' || c == '}') {
-                // Look ahead, skipping whitespace, for the start of another value.
-                int j = i + 1;
-                while (j < json.length() && Character.isWhitespace(json.charAt(j))) {
-                    j++;
-                }
-                if (j < json.length()) {
-                    char next = json.charAt(j);
-                    if (next == '"' || next == '[' || next == '{') {
-                        // Two values are adjacent without a comma — insert one.
-                        sb.append(',');
-                    }
-                }
-            }
-        }
-        return sb.toString();
-    }
-
-    /**
-     * Removes commas that appear immediately before a closing bracket, which is
-     * invalid JSON but commonly emitted by LLMs (e.g. {@code [1, 2,]}).
-     */
-    private static String removeTrailingCommas(String json) {
-        StringBuilder sb = new StringBuilder(json.length());
-        boolean inString = false;
-        boolean escaped = false;
-        for (int i = 0; i < json.length(); i++) {
-            char c = json.charAt(i);
-            if (inString) {
-                sb.append(c);
-                if (escaped) {
-                    escaped = false;
-                } else if (c == '\\') {
-                    escaped = true;
-                } else if (c == '"') {
-                    inString = false;
-                }
-                continue;
-            }
-            if (c == '"') {
-                inString = true;
-                sb.append(c);
-                continue;
-            }
-            if (c == ',') {
-                // Look ahead, skipping whitespace, for a closing bracket.
-                int j = i + 1;
-                while (j < json.length() && Character.isWhitespace(json.charAt(j))) {
-                    j++;
-                }
-                if (j < json.length() && (json.charAt(j) == ']' || json.charAt(j) == '}')) {
-                    // Skip this trailing comma.
-                    continue;
-                }
-            }
-            sb.append(c);
-        }
-        return sb.toString();
+        String repaired = json;
+        // Insert missing commas between a closing quote and an opening quote/brace/bracket.
+        repaired = repaired.replaceAll("(\\S)(\\s+)([\\[\\{])", "$1,$2$3");
+        repaired = repaired.replaceAll("([\"'])\\s+([\"'\\[\\{])", "$1,$2");
+        // Remove trailing commas before } or ].
+        repaired = repaired.replaceAll(",\\s*([}\\]])", "$1");
+        return repaired;
     }
 }

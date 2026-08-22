@@ -1,8 +1,10 @@
 package com.ooooyt.babycommander.service;
 
+import com.ooooyt.babycommander.db.entity.PhaseEntity;
 import com.ooooyt.babycommander.db.entity.ProjectEntity;
 import com.ooooyt.babycommander.db.entity.TaskEntity;
 import com.ooooyt.babycommander.db.entity.TaskToolExecutionEntity;
+import com.ooooyt.babycommander.db.repository.PhaseRepository;
 import com.ooooyt.babycommander.db.repository.ProjectRepository;
 import com.ooooyt.babycommander.db.repository.TaskRepository;
 import com.ooooyt.babycommander.db.repository.TaskToolExecutionRepository;
@@ -17,7 +19,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Service for managing projects, tasks, and tool executions.
+ * Service for managing projects, tasks, phases, and tool executions.
  * <p>
  * All data is inserted/updated in strict consistent order with the real time sequence.
  * Each method ensures the database state reflects the actual chronological
@@ -31,6 +33,9 @@ public class ProjectTaskService {
 
     @Inject
     TaskRepository taskRepository;
+
+    @Inject
+    PhaseRepository phaseRepository;
 
     @Inject
     TaskToolExecutionRepository taskToolExecutionRepository;
@@ -218,6 +223,73 @@ public class ProjectTaskService {
             return searchProjectTasks(projectId, query);
         }
         return taskRepository.findNearestNeighbors(projectId, queryVector, maxResults);
+    }
+
+    // ──────────────────────────────────────────────
+    // Phase operations
+    // ──────────────────────────────────────────────
+
+    /**
+     * Deletes any existing phases for the task and persists the given phases
+     * (title, description, status, order). Called when a plan is (re)created.
+     *
+     * @param taskId  the task business ID
+     * @param phases  the phases to persist, in plan order
+     */
+    public void replacePhases(String taskId, List<PhaseData> phases) {
+        TaskEntity task = taskRepository.findById(taskId);
+        if (task == null) {
+            throw new IllegalArgumentException("Task not found: " + taskId);
+        }
+        // Remove any previously persisted phases for this task.
+        boxStore.runInTx(() -> {
+            for (PhaseEntity existing : phaseRepository.findByTaskId(taskId)) {
+                phaseRepository.delete(existing);
+            }
+            long now = System.currentTimeMillis();
+            for (int i = 0; i < phases.size(); i++) {
+                PhaseData data = phases.get(i);
+                PhaseEntity entity = new PhaseEntity();
+                entity.id = UUID.randomUUID().toString();
+                entity.taskId = taskId;
+                entity.phaseIndex = i;
+                entity.title = data.title();
+                entity.description = data.description();
+                entity.status = data.status();
+                entity.createdDatetime = now;
+                entity.updatedDatetime = now;
+                phaseRepository.save(entity);
+            }
+        });
+    }
+
+    /**
+     * Updates the status of the phase at the given index within a task.
+     * Used when a PlanUpdate event reports a phase status transition.
+     *
+     * @param taskId     the task business ID
+     * @param phaseIndex the 0-based position of the phase in the plan
+     * @param status     the new phase status (active/pending/completed/failed)
+     */
+    public void updatePhaseStatus(String taskId, int phaseIndex, String status) {
+        PhaseEntity entity = phaseRepository.findByTaskId(taskId).stream()
+                .filter(p -> p.phaseIndex == phaseIndex)
+                .findFirst()
+                .orElse(null);
+        if (entity == null) {
+            return;
+        }
+        entity.status = status;
+        entity.updatedDatetime = System.currentTimeMillis();
+        boxStore.runInTx(() -> phaseRepository.update(entity));
+    }
+
+    public List<PhaseEntity> getTaskPhases(String taskId) {
+        return phaseRepository.findByTaskIdOrdered(taskId);
+    }
+
+    /** Lightweight snapshot of a phase used for persistence. */
+    public record PhaseData(String title, String description, String status) {
     }
 
     // ──────────────────────────────────────────────

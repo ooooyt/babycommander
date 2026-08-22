@@ -7,6 +7,7 @@ import com.ooooyt.babycommander.config.AgentConfig;
 import com.ooooyt.babycommander.config.AgentConfig.ProviderConfig;
 import com.ooooyt.babycommander.config.YamlConfigLoader;
 import com.ooooyt.babycommander.hook.SessionMemory;
+import com.ooooyt.babycommander.service.ProjectTaskService;
 import com.ooooyt.babycommander.tool.PlanTool;
 import com.ooooyt.babycommander.tool.ResilientToolExecutor;
 import com.ooooyt.babycommander.tool.ToolRegistry;
@@ -42,17 +43,33 @@ public class AgentFactory {
     private final SessionMemory sessionMemory;
     private final CodeGenLifecycle lifecycle;
     private final ConversationCompactor conversationCompactor;
+    private final ProjectTaskService projectTaskService;
     private final Map<String, AgentContext> activeAgents = new ConcurrentHashMap<>();
     private static final int SEQUENTIAL_TOOLS_LIMIT = 500;
 
+    /**
+     * CDI constructor. {@code projectTaskService} is passed through to each
+     * {@link ResilientToolExecutor} so tool executions can be persisted.
+     */
     @Inject
     public AgentFactory(YamlConfigLoader configLoader, ToolRegistry toolRegistry, SessionMemory sessionMemory,
-                        CodeGenLifecycle lifecycle, ConversationCompactor conversationCompactor) {
+                        CodeGenLifecycle lifecycle, ConversationCompactor conversationCompactor,
+                        ProjectTaskService projectTaskService) {
         this.configLoader = configLoader;
         this.toolRegistry = toolRegistry;
         this.sessionMemory = sessionMemory;
         this.lifecycle = lifecycle;
         this.conversationCompactor = conversationCompactor;
+        this.projectTaskService = projectTaskService;
+    }
+
+    /**
+     * Backward-compatible constructor for tests that do not need tool-execution
+     * persistence. Delegates to the full constructor with a {@code null} service.
+     */
+    public AgentFactory(YamlConfigLoader configLoader, ToolRegistry toolRegistry, SessionMemory sessionMemory,
+                        CodeGenLifecycle lifecycle, ConversationCompactor conversationCompactor) {
+        this(configLoader, toolRegistry, sessionMemory, lifecycle, conversationCompactor, null);
     }
 
     private AgentConfig config() {
@@ -74,7 +91,7 @@ public class AgentFactory {
                 executors.put(spec, new ResilientToolExecutor(tool, ToolExecutionRequest.builder()
                         .name(spec.name())
                         .arguments("{}")
-                        .build()));
+                        .build(), projectTaskService));
             }
         }
         return executors;

@@ -370,10 +370,68 @@
         }
       ],
       "relations": []
+    },
+    {
+      "id": "8:9213569041927992046",
+      "lastPropertyId": "9:8929397487229682856",
+      "name": "PhaseEntity",
+      "properties": [
+        {
+          "id": "1:125960056787317816",
+          "name": "objectBoxId",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:4338763534747478982",
+          "name": "id",
+          "indexId": "16:7521452507443270241",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "3:5604333512530078924",
+          "name": "taskId",
+          "indexId": "17:3920354364747072146",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "4:5959749320688556729",
+          "name": "phaseIndex",
+          "type": 5
+        },
+        {
+          "id": "5:9143530495549221379",
+          "name": "title",
+          "type": 9
+        },
+        {
+          "id": "6:2125934887235893245",
+          "name": "description",
+          "type": 9
+        },
+        {
+          "id": "7:7145480706776539084",
+          "name": "status",
+          "type": 9
+        },
+        {
+          "id": "8:2934159044575297482",
+          "name": "createdDatetime",
+          "type": 6
+        },
+        {
+          "id": "9:8929397487229682856",
+          "name": "updatedDatetime",
+          "type": 6
+        }
+      ],
+      "relations": []
     }
   ],
-  "lastEntityId": "7:7789907923516242709",
-  "lastIndexId": "15:1732300581180433374",
+  "lastEntityId": "8:9213569041927992046",
+  "lastIndexId": "17:3920354364747072146",
   "lastRelationId": "0:0",
   "lastSequenceId": "0:0",
   "modelVersion": 5,
