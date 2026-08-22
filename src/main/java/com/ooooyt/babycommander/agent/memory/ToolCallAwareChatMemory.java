@@ -115,7 +115,49 @@ public class ToolCallAwareChatMemory implements ChatMemory {
         for (int i = start; i < messages.size(); i++) {
             combined.add(messages.get(i));
         }
+        // Guard against the OpenAI/DeepSeek requirement that every assistant
+        // message carrying tool calls must be immediately followed by tool
+        // messages responding to each toolCallId. A dangling AiMessage (tool
+        // calls whose ToolExecutionResultMessages have not been appended) would
+        // be rejected with "insufficient tool messages following toolcalls".
+        // Strip those tool calls here so the returned list is always API-valid.
+        stripDanglingToolCalls(combined);
         return combined;
+    }
+
+    /**
+     * Removes tool-execution requests from any AiMessage whose results are not
+     * present in the immediately following messages. Keeps the assistant's text
+     * when present; otherwise drops the empty message entirely (an assistant
+     * message with neither content nor tool_calls is also rejected by the API).
+     */
+    private static void stripDanglingToolCalls(List<ChatMessage> messages) {
+        for (int i = 0; i < messages.size(); i++) {
+            ChatMessage msg = messages.get(i);
+            if (!(msg instanceof AiMessage ai) || !ai.hasToolExecutionRequests()) {
+                continue;
+            }
+            List<String> expectedIds = ai.toolExecutionRequests().stream()
+                .map(r -> r.id()).toList();
+            int matched = 0;
+            for (int j = i + 1; j < messages.size() && matched < expectedIds.size(); j++) {
+                ChatMessage next = messages.get(j);
+                if (next instanceof ToolExecutionResultMessage trm
+                        && expectedIds.contains(trm.id())) {
+                    matched++;
+                } else {
+                    break;
+                }
+            }
+            if (matched < expectedIds.size()) {
+                if (ai.text() != null && !ai.text().isEmpty()) {
+                    messages.set(i, AiMessage.from(ai.text()));
+                } else {
+                    messages.remove(i);
+                    i--;
+                }
+            }
+        }
     }
 
     @Override

@@ -344,4 +344,47 @@ class ToolCallAwareChatMemoryTest {
                 "Message at index " + i + " should be equal on repeated calls");
         }
     }
+
+    @Test
+    void testMessagesStripsDanglingToolCallWithoutResults() {
+        ToolCallAwareChatMemory memory = new ToolCallAwareChatMemory("test");
+        memory.add(UserMessage.userMessage("do task"));
+        // Assistant requests a tool call but no ToolExecutionResultMessage follows.
+        memory.add(AiMessage.aiMessage(List.of(request("dangling-call"))));
+
+        List<ChatMessage> result = memory.messages();
+        // The dangling AiMessage (no text) must be dropped so the API request is valid.
+        assertEquals(1, result.size());
+        assertEquals(UserMessage.class, result.get(0).getClass());
+    }
+
+    @Test
+    void testMessagesKeepsTextWhenStrippingDanglingToolCall() {
+        ToolCallAwareChatMemory memory = new ToolCallAwareChatMemory("test");
+        memory.add(UserMessage.userMessage("do task"));
+        // Assistant message with text AND a dangling tool call (no results).
+        AiMessage ai = new AiMessage("Let me search first", List.of(request("dangling-call")));
+        memory.add(ai);
+
+        List<ChatMessage> result = memory.messages();
+        assertEquals(2, result.size());
+        AiMessage last = (AiMessage) result.get(1);
+        assertEquals("Let me search first", last.text());
+        assertFalse(last.hasToolExecutionRequests(), "dangling tool call should be stripped");
+    }
+
+    @Test
+    void testMessagesPreservesCompleteToolCallPair() {
+        ToolCallAwareChatMemory memory = new ToolCallAwareChatMemory("test");
+        memory.add(UserMessage.userMessage("do task"));
+        AiMessage ai = AiMessage.aiMessage(List.of(request("call-ok")));
+        memory.add(ai);
+        memory.add(ToolExecutionResultMessage.from("call-ok", "read_file", "content"));
+
+        List<ChatMessage> result = memory.messages();
+        assertEquals(3, result.size());
+        assertTrue(((AiMessage) result.get(1)).hasToolExecutionRequests(),
+            "complete tool call pair must be preserved");
+    }
+
 }
