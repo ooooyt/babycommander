@@ -68,6 +68,13 @@ public class HookManager {
         DangerLevel level = resolveLevel(toolName, methodName, args);
         if (level == DangerLevel.SAFE) return;
 
+        // In-scope auto-trust: operations confined to the current project
+        // folder are safe unless external resources are impacted (dangerous).
+        if (level == DangerLevel.ASK_ONCE && trustProjectEnabled()
+                && isInScopeOperation(toolName, methodName, args)) {
+            return;
+        }
+
         String sessionId = currentSession();
 
         // Method-level trust: skip if this tool+method was previously ALLOW_ALWAYS'd
@@ -140,6 +147,13 @@ public class HookManager {
 
         DangerLevel level = resolveLevel(toolName, methodName, args);
         if (level == DangerLevel.SAFE) return realCall.call();
+
+        // In-scope auto-trust: operations confined to the current project
+        // folder are safe unless external resources are impacted (dangerous).
+        if (level == DangerLevel.ASK_ONCE && trustProjectEnabled()
+                && isInScopeOperation(toolName, methodName, args)) {
+            return realCall.call();
+        }
 
         // Method-level trust
         if (level == DangerLevel.ASK_ONCE && sessionMemory.isMethodAllowed(sessionId, toolName, methodName)) return realCall.call();
@@ -256,6 +270,101 @@ public class HookManager {
             return s;
         }
         return null;
+    }
+
+    /**
+     * Returns {@code true} when the configured trust mode permits automatic
+     * trust of operations confined to the current project folder. Only
+     * {@code STRICT} disables in-scope auto-trust; {@code AUTO} and
+     * {@code ALWAYS} both enable it (they differ only in documentation of
+     * intent). This never affects {@code dangerous} operations, which are
+     * always gated.
+     */
+    private boolean trustProjectEnabled() {
+        AgentConfig config = configLoader.getConfig();
+        if (config == null || config.hooks == null) return true;
+        AgentConfig.TrustProjectMode mode =
+                AgentConfig.TrustProjectMode.fromString(config.hooks.trustProject);
+        return mode != AgentConfig.TrustProjectMode.STRICT;
+    }
+
+    /**
+     * Decides whether a tool call operates entirely within the current project
+     * folder, with no impact on external resources.
+     * <ul>
+     *   <li><b>FileSystemTool</b>: the target path ({@code args[0]}) must resolve
+     *   under the current project root.</li>
+     *   <li><b>ShellTool</b>: every path extracted from the command must be
+     *   in-scope. If the command matches a {@code dangerous} pattern it is
+     *   never considered in-scope (dangerous always wins).</li>
+     *   <li>All other tools: {@code false} (conservative).</li>
+     * </ul>
+     */
+    private boolean isInScopeOperation(String toolName, String methodName, Object[] args) {
+        String root = currentProjectRoot;
+        String ws = workspaceRoot();
+
+        if ("FileSystemTool".equals(toolName)) {
+            String fp = PathExtractor.firstPath(toolName, args, ws, root);
+            if (fp == null) return false;
+            return isPathUnderRoot(fp, root);
+        }
+
+        if ("ShellTool".equals(toolName)) {
+            if (matchesDangerousPattern(toolName, args)) return false;
+            List<String> paths = PathExtractor.extract(toolName, args, ws);
+            if (paths.isEmpty()) return false;
+            for (String p : paths) {
+                if (!isPathUnderRoot(p, root)) return false;
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Returns {@code true} if {@code normalizedPath} (already normalized against
+     * the workspace root) is located under {@code root}.
+     */
+    private static boolean isPathUnderRoot(String normalizedPath, String root) {
+        if (root == null || root.isBlank()) return false;
+        if (normalizedPath == null || normalizedPath.isBlank()) return false;
+        java.nio.file.Path abs = java.nio.file.Path.of(root).normalize();
+        java.nio.file.Path target;
+        try {
+            target = java.nio.file.Path.of(normalizedPath).normalize();
+        } catch (Exception e) {
+            return false;
+        }
+        // If the normalized path is relative (resolved against workspace root),
+        // resolve it against the project root for a reliable prefix check.
+        if (!target.isAbsolute()) {
+            target = abs.resolve(target).normalize();
+        }
+        return target.startsWith(abs);
+    }
+
+    /**
+     * Returns {@code true} if the shell command matches any configured
+     * {@code dangerous} pattern for the tool. Dangerous patterns always win,
+     * so such commands are never auto-trusted.
+     */
+    private boolean matchesDangerousPattern(String toolName, Object[] args) {
+        AgentConfig config = configLoader.getConfig();
+        if (config == null || config.hooks == null || config.hooks.patterns == null) return false;
+        String command = extractFirstStringArg(args);
+        if (command == null) return false;
+        for (AgentConfig.PatternGroup pg : config.hooks.patterns.values()) {
+            if (pg.tool != null && pg.tool.equals(toolName)
+                    && "dangerous".equalsIgnoreCase(pg.level)
+                    && pg.compiledPatterns != null) {
+                for (Pattern p : pg.compiledPatterns) {
+                    if (p.matcher(command).find()) return true;
+                }
+            }
+        }
+        return false;
     }
 
     private boolean isEnabled() {

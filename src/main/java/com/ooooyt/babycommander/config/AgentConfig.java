@@ -111,12 +111,49 @@ public class AgentConfig {
         @JsonProperty("enabled")
         public boolean enabled = true;
 
+        /**
+         * Controls automatic trust of operations confined to the current
+         * project folder. One of {@code auto} (default), {@code always}, or
+         * {@code strict}. See {@link TrustProjectMode}.
+         */
+        @JsonProperty("trustProject")
+        public String trustProject = "auto";
+
         @JsonProperty("rules")
         public List<HookRule> rules = new java.util.ArrayList<>();
 
         @JsonProperty("patterns")
         @com.fasterxml.jackson.annotation.JsonSetter(nulls = com.fasterxml.jackson.annotation.Nulls.SKIP)
         public Map<String, PatternGroup> patterns = new java.util.HashMap<>();
+    }
+
+    /**
+     * Trust mode for operations confined to the current project folder.
+     * <ul>
+     *   <li>{@link #AUTO} — auto-allow in-scope {@code ask_once} operations,
+     *   prompt only for out-of-scope or {@code dangerous} ones.</li>
+     *   <li>{@link #ALWAYS} — never prompt for in-scope {@code ask_once}
+     *   operations (fully autonomous).</li>
+     *   <li>{@link #STRICT} — prompt for every {@code ask_once} operation.</li>
+     * </ul>
+     */
+    public enum TrustProjectMode {
+        AUTO,
+        ALWAYS,
+        STRICT;
+
+        /**
+         * Parse a string value into a {@code TrustProjectMode}, defaulting to
+         * {@link #AUTO} for null, blank, or unrecognized values.
+         */
+        public static TrustProjectMode fromString(String value) {
+            if (value == null || value.isBlank()) return AUTO;
+            try {
+                return TrustProjectMode.valueOf(value.trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return AUTO;
+            }
+        }
     }
 
     public static class HookRule {

@@ -713,7 +713,7 @@ public class MarkdownRenderer {
         if (cp < 0x20) return 0;
         if (cp < 0x7F) return 1;
         // Explicitly-whitelisted symbols used in UI labels
-        if (cp == 0x2AFF) return 1;    // ⿻ Open Toaster branding
+        if (cp == 0x2AFF) return 1;    // ⿻ Baby Commander branding
         if (cp >= 0x0300 && cp <= 0x036F) return 0;
         if (cp >= 0x1DC0 && cp <= 0x1DE6) return 0;
         if (cp >= 0x20D0 && cp <= 0x20FF) return 0;

@@ -134,6 +134,12 @@ public class YamlConfigLoader {
                 }
             });
         }
+        // Allow overriding the in-scope trust mode via the
+        // BABY_COMMANDER_TRUST_PROJECT environment variable, e.g.
+        // "strict" or "auto" (see AgentConfig.TrustProjectMode).
+        if (cfg.hooks != null && cfg.hooks.trustProject != null) {
+            cfg.hooks.trustProject = resolveString(cfg.hooks.trustProject);
+        }
     }
 
     private void compilePatterns(AgentConfig cfg) {

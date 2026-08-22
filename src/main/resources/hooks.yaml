@@ -1,6 +1,10 @@
 # Hook configuration for tool call safety levels
 # This file is loaded separately from agents.yaml
 enabled: true
+# In-scope auto-trust: operations confined to the current project folder
+# (auto) run without confirmation unless dangerous; 'strict' prompts always;
+# 'always' never prompts for in-scope ask_once operations.
+trustProject: ${BABY_COMMANDER_TRUST_PROJECT:auto}
 rules:
   - tool: "ShellTool"
     level: "dangerous"

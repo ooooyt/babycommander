@@ -86,15 +86,15 @@ environment variables:
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `OPEN_TOASTER_DEFAULT_MODEL` | Default provider key | `openai` |
-| `OPEN_TOASTER_WORKSPACE_ROOT` | Workspace root directory | — |
-| `OPEN_TOASTER_SKIP_CONFIRM_WORKSPACE` | Skip workspace confirmation | `false` |
+| `BABY_COMMANDER_DEFAULT_MODEL` | Default provider key | `openai` |
+| `BABY_COMMANDER_WORKSPACE_ROOT` | Workspace root directory | — |
+| `BABY_COMMANDER_SKIP_CONFIRM_WORKSPACE` | Skip workspace confirmation | `false` |
 | `OPENAI_API_KEY` | OpenAI/Qwen-compatible key | — |
 | `ANTHROPIC_API_KEY` | Anthropic key | — |
 | `DEEPSEEK_API_KEY` | DeepSeek key | — |
 | `OLLAMA_KEY` | Ollama/NVIDIA endpoint key | — |
-| `OPEN_TOASTER_<PROVIDER>_BASE_URL` / `_MODEL` / `_TEMPERATURE` / `_MAX_TOKENS` / `_TIMEOUT_SECONDS` | Per-provider overrides | see file |
-| `OPEN_TOASTER_MAX_MESSAGES_IN_MEMORY`, `OPEN_TOASTER_MAX_TOOL_CALLS`, `OPEN_TOASTER_MAX_TOKENS_IN_MEMORY`, `OPEN_TOASTER_TOOL_OUTPUT_TRUNCATION_KB` | Memory/token limits | see file |
+| `BABY_COMMANDER_<PROVIDER>_BASE_URL` / `_MODEL` / `_TEMPERATURE` / `_MAX_TOKENS` / `_TIMEOUT_SECONDS` | Per-provider overrides | see file |
+| `BABY_COMMANDER_MAX_MESSAGES_IN_MEMORY`, `BABY_COMMANDER_MAX_TOOL_CALLS`, `BABY_COMMANDER_MAX_TOKENS_IN_MEMORY`, `BABY_COMMANDER_TOOL_OUTPUT_TRUNCATION_KB` | Memory/token limits | see file |
 
 ### `application.properties`
 
@@ -115,6 +115,21 @@ Each tool call is classified by regex pattern matching:
 - **dangerous** — destructive operations (`rm -rf`, `sudo`, `dd`, `shutdown`, `DROP TABLE`, …) are gated
 
 Custom rules and patterns can be added under `rules:` and `patterns:`.
+
+### In-scope auto-trust (`trustProject`)
+
+By default, operations confined to the current project folder (e.g. editing files
+or running build commands that only touch the project) are trusted automatically
+and run without a confirmation prompt — unless they are classified **dangerous**.
+Set `trustProject` in `hooks.yaml` (or the `BABY_COMMANDER_TRUST_PROJECT`
+environment variable) to one of:
+
+- `auto` (default) — auto-allow in-scope `ask_once` operations; prompt only for
+  out-of-scope or dangerous ones.
+- `always` — never prompt for in-scope `ask_once` operations (fully autonomous).
+- `strict` — prompt for every `ask_once` operation (the pre-`auto` behavior).
+
+Dangerous patterns always win: destructive commands are never auto-trusted.
 
 ### Skills
 

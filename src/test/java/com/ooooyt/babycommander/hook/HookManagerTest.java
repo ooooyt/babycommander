@@ -44,6 +44,9 @@ class HookManagerTest {
         config = new AgentConfig();
         config.hooks = new AgentConfig.HookConfig();
         config.hooks.enabled = true;
+        // These legacy tests exercise the prompt + path-grant mechanism for
+        // in-scope operations, so pin the pre-auto behavior (strict).
+        config.hooks.trustProject = "strict";
 
         AgentConfig.HookRule shellRule = new AgentConfig.HookRule();
         shellRule.tool = "ShellTool";
