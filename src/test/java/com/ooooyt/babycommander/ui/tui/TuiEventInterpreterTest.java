@@ -1,9 +1,14 @@
 package com.ooooyt.babycommander.ui.tui;
 
+import com.ooooyt.babycommander.tool.PlanTool;
 import com.ooooyt.babycommander.ui.UiEvent;
 import io.vertx.core.json.JsonObject;
+import io.vertx.mutiny.core.eventbus.EventBus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -18,10 +23,14 @@ import static org.junit.jupiter.api.Assertions.*;
  * (e.g. underscores in {@code write_file} paths were dropped as italics, and
  * backticks/emoji removed). Tool call messages must always be shown verbatim.
  */
+@ExtendWith(MockitoExtension.class)
 class TuiEventInterpreterTest {
 
     private TuiModel model;
     private TuiEventInterpreter interpreter;
+
+    @Mock
+    EventBus eventBus;
 
     @BeforeEach
     void setUp() {
@@ -249,5 +258,34 @@ class TuiEventInterpreterTest {
             assertEquals(0, model.chatMessages.size(),
                 "Tool calling pairs must be hidden when showToolCallPairs is false");
         }
+    }
+
+    @Test
+    void refreshPlanFromTool_returnsFalseWhenPlanUnchanged() {
+        // Regression test for the cursor-blinking bug: once a plan exists, the
+        // idle loop calls refreshPlanFromTool() every 100 ms. It must return
+        // false when the plan snapshot has not changed since the last render,
+        // so the loop does not force a hide/redraw/show every 100 ms (which
+        // resets the terminal's native cursor blink). It must still return
+        // true when the plan actually changes.
+        PlanTool planTool = new PlanTool(eventBus);
+
+        // Create a plan; the first refresh sees a change (empty -> plan).
+        planTool.createPlanFromStrings("Task", new String[]{"Phase 1", "Phase 2"});
+        assertTrue(interpreter.refreshPlanFromTool(),
+            "First refresh after a new plan must report a change");
+
+        // Same plan again: no change -> no redraw needed.
+        assertFalse(interpreter.refreshPlanFromTool(),
+            "Unchanged plan must not trigger a redraw (breaks cursor blinking)");
+
+        // Advance the plan (complete phase 1): snapshot differs -> redraw.
+        planTool.completePhase(1);
+        assertTrue(interpreter.refreshPlanFromTool(),
+            "A plan status change must be reported so the panel repaints");
+
+        // Same (now updated) plan again: no change.
+        assertFalse(interpreter.refreshPlanFromTool(),
+            "Unchanged plan after a status change must not trigger a redraw");
     }
 }

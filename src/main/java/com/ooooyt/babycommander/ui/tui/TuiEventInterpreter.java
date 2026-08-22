@@ -27,6 +27,16 @@ final class TuiEventInterpreter {
     private final boolean showToolCallPairs;
     private final List<String> pendingAfterThinkingTexts = new ArrayList<>();
 
+    /**
+     * The most recently rendered plan snapshot. Used by
+     * {@link #refreshPlanFromTool()} to decide whether the plan actually
+     * changed since the last render, so the idle loop does not force a
+     * redundant redraw (and cursor hide/show) every 100 ms once a plan
+     * exists &mdash; which would otherwise break the terminal's native
+     * cursor blinking.
+     */
+    private List<UiEvent.Phase> lastRenderedPlan = List.of();
+
     TuiEventInterpreter(TuiModel model) {
         this(model, false);
     }
@@ -96,6 +106,10 @@ final class TuiEventInterpreter {
                     model.infoLines.clear();
                     model.infoLines.addAll(lines);
                 }
+                // Keep the last-rendered snapshot in sync so the idle poll in
+                // refreshPlanFromTool does not treat this same plan as a change
+                // and force a redundant redraw on the next idle tick.
+                lastRenderedPlan = List.copyOf(pu.phases());
                 model.dirty = true;
             }
             case UiEvent.ClarificationRequest r -> {
@@ -247,16 +261,26 @@ final class TuiEventInterpreter {
         model.autoScroll = true;
         model.dirty = true;
     }
+
     /**
      * Rebuilds the left-pane plan/info lines from the latest {@link PlanTool}
      * snapshot. Returns {@code false} (no redraw needed) when there is no
-     * plan snapshot, mirroring the original behaviour.
+     * plan snapshot, or when the plan has not changed since the last render,
+     * so the idle loop does not force a redundant redraw (and cursor
+     * hide/show) every 100 ms once a plan exists &mdash; which would
+     * otherwise break the terminal's native cursor blinking.
      */
     boolean refreshPlanFromTool() {
         List<UiEvent.Phase> snapshot = PlanTool.getLatestSnapshot();
         if (snapshot.isEmpty()) {
             return false;
         }
+        // Plan unchanged since the last render (either via refreshPlanFromTool
+        // or a PlanUpdate event): nothing to repaint, so keep the cursor steady.
+        if (lastRenderedPlan.equals(snapshot)) {
+            return false;
+        }
+        lastRenderedPlan = List.copyOf(snapshot);
         List<InfoLine> lines = buildPlanInfo(PlanTool.getLatestTask(), snapshot);
         synchronized (model.infoLines) {
             model.infoLines.clear();
