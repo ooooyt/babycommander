@@ -35,7 +35,7 @@ class PlanToolTest {
 
     @Test
     void testCreatePlan_WithValidInput() {
-        String result = planTool.createPlan("Test task", new String[]{"Phase 1", "Phase 2", "Phase 3"});
+        String result = planTool.createPlanFromStrings("Test task", new String[]{"Phase 1", "Phase 2", "Phase 3"});
         assertNotNull(result);
         assertTrue(planTool.hasPhases());
         assertTrue(planTool.hasInProgressPhases());
@@ -43,7 +43,7 @@ class PlanToolTest {
 
     @Test
     void testCreatePlan_FirstPhaseIsActive() {
-        planTool.createPlan("Task", new String[]{"First", "Second"});
+        planTool.createPlanFromStrings("Task", new String[]{"First", "Second"});
         List<UiEvent.Phase> phases = planTool.getPhases();
         assertEquals(2, phases.size());
         assertEquals("active", phases.get(0).status());
@@ -52,26 +52,26 @@ class PlanToolTest {
 
     @Test
     void testCreatePlan_RejectsWhenInProgress() {
-        planTool.createPlan("Task", new String[]{"Phase 1", "Phase 2"});
-        String result = planTool.createPlan("New task", new String[]{"New phase"});
+        planTool.createPlanFromStrings("Task", new String[]{"Phase 1", "Phase 2"});
+        String result = planTool.createPlanFromStrings("New task", new String[]{"New phase"});
         assertTrue(result.contains("in progress") || result.contains("Cannot"));
     }
 
     @Test
     void testCreatePlan_WithNullTask() {
-        String result = planTool.createPlan(null, new String[]{"Phase 1"});
+        String result = planTool.createPlanFromStrings(null, new String[]{"Phase 1"});
         assertNotNull(result);
     }
 
     @Test
     void testCreatePlan_WithEmptyPhases() {
-        String result = planTool.createPlan("Task", new String[]{});
+        String result = planTool.createPlanFromStrings("Task", new String[]{});
         assertNotNull(result);
     }
 
     @Test
     void testCompletePhase_ValidPhase() {
-        planTool.createPlan("Task", new String[]{"Phase 1", "Phase 2"});
+        planTool.createPlanFromStrings("Task", new String[]{"Phase 1", "Phase 2"});
         String result = planTool.completePhase(1);
         assertNotNull(result);
         List<UiEvent.Phase> phases = planTool.getPhases();
@@ -81,7 +81,7 @@ class PlanToolTest {
 
     @Test
     void testCompletePhase_LastPhase() {
-        planTool.createPlan("Task", new String[]{"Only phase"});
+        planTool.createPlanFromStrings("Task", new String[]{"Only phase"});
         String result = planTool.completePhase(1);
         assertNotNull(result);
         List<UiEvent.Phase> phases = planTool.getPhases();
@@ -91,21 +91,21 @@ class PlanToolTest {
 
     @Test
     void testCompletePhase_InvalidPhaseNumber_TooLow() {
-        planTool.createPlan("Task", new String[]{"Phase 1"});
+        planTool.createPlanFromStrings("Task", new String[]{"Phase 1"});
         String result = planTool.completePhase(0);
         assertNotNull(result);
     }
 
     @Test
     void testCompletePhase_InvalidPhaseNumber_TooHigh() {
-        planTool.createPlan("Task", new String[]{"Phase 1"});
+        planTool.createPlanFromStrings("Task", new String[]{"Phase 1"});
         String result = planTool.completePhase(99);
         assertNotNull(result);
     }
 
     @Test
     void testCompletePhase_NotActivePhase() {
-        planTool.createPlan("Task", new String[]{"Phase 1", "Phase 2"});
+        planTool.createPlanFromStrings("Task", new String[]{"Phase 1", "Phase 2"});
         // Phase 2 is pending, not active
         String result = planTool.completePhase(2);
         assertNotNull(result);
@@ -114,7 +114,7 @@ class PlanToolTest {
 
     @Test
     void testFailPhase_ValidPhase() {
-        planTool.createPlan("Task", new String[]{"Phase 1", "Phase 2"});
+        planTool.createPlanFromStrings("Task", new String[]{"Phase 1", "Phase 2"});
         String result = planTool.failPhase(1);
         assertNotNull(result);
         List<UiEvent.Phase> phases = planTool.getPhases();
@@ -123,14 +123,14 @@ class PlanToolTest {
 
     @Test
     void testFailPhase_InvalidPhaseNumber() {
-        planTool.createPlan("Task", new String[]{"Phase 1"});
+        planTool.createPlanFromStrings("Task", new String[]{"Phase 1"});
         String result = planTool.failPhase(99);
         assertNotNull(result);
     }
 
     @Test
     void testFailPhase_NotActivePhase() {
-        planTool.createPlan("Task", new String[]{"Phase 1", "Phase 2"});
+        planTool.createPlanFromStrings("Task", new String[]{"Phase 1", "Phase 2"});
         String result = planTool.failPhase(2);
         assertNotNull(result);
         List<UiEvent.Phase> phases = planTool.getPhases();
@@ -139,7 +139,7 @@ class PlanToolTest {
 
     @Test
     void testCompleteAllRemainingPhases() {
-        planTool.createPlan("Task", new String[]{"Phase 1", "Phase 2", "Phase 3"});
+        planTool.createPlanFromStrings("Task", new String[]{"Phase 1", "Phase 2", "Phase 3"});
         planTool.completePhase(1);
         planTool.completeAllRemainingPhases();
         List<UiEvent.Phase> phases = planTool.getPhases();
@@ -151,7 +151,7 @@ class PlanToolTest {
 
     @Test
     void testCompleteAllRemainingPhases_NoInProgress() {
-        planTool.createPlan("Task", new String[]{"Phase 1", "Phase 2"});
+        planTool.createPlanFromStrings("Task", new String[]{"Phase 1", "Phase 2"});
         planTool.completeAllRemainingPhases();
         List<UiEvent.Phase> phases = planTool.getPhases();
         assertEquals("completed", phases.get(0).status());
@@ -170,7 +170,7 @@ class PlanToolTest {
 
     @Test
     void testGetLatestSnapshot() {
-        planTool.createPlan("Task", new String[]{"Phase 1"});
+        planTool.createPlanFromStrings("Task", new String[]{"Phase 1"});
         List<UiEvent.Phase> snapshot = PlanTool.getLatestSnapshot();
         assertNotNull(snapshot);
         assertEquals(1, snapshot.size());
@@ -178,7 +178,7 @@ class PlanToolTest {
 
     @Test
     void testGetLatestSnapshot_ReturnsCopy() {
-        planTool.createPlan("Task", new String[]{"Phase 1"});
+        planTool.createPlanFromStrings("Task", new String[]{"Phase 1"});
         List<UiEvent.Phase> snapshot = PlanTool.getLatestSnapshot();
         assertNotNull(snapshot);
         assertEquals(1, snapshot.size());
@@ -187,13 +187,13 @@ class PlanToolTest {
 
     @Test
     void testGetLatestTask() {
-        planTool.createPlan("My Task", new String[]{"Phase 1"});
+        planTool.createPlanFromStrings("My Task", new String[]{"Phase 1"});
         assertEquals("My Task", PlanTool.getLatestTask());
     }
 
     @Test
     void testGetLatestTask_WithNullTask() {
-        String result = planTool.createPlan(null, new String[]{"Phase 1"});
+        String result = planTool.createPlanFromStrings(null, new String[]{"Phase 1"});
         assertNotNull(result);
         assertTrue(result.contains("task"));
     }
@@ -207,7 +207,7 @@ class PlanToolTest {
 
     @Test
     void testFailAllRemainingPhases_WithActiveAndPending() {
-        planTool.createPlan("Task", new String[]{"Phase 1", "Phase 2", "Phase 3"});
+        planTool.createPlanFromStrings("Task", new String[]{"Phase 1", "Phase 2", "Phase 3"});
         planTool.completePhase(1);
         // Now: phase1=completed, phase2=active, phase3=pending
         planTool.failAllRemainingPhases();
@@ -220,7 +220,7 @@ class PlanToolTest {
 
     @Test
     void testFailAllRemainingPhases_AllCompleted() {
-        planTool.createPlan("Task", new String[]{"Phase 1"});
+        planTool.createPlanFromStrings("Task", new String[]{"Phase 1"});
         planTool.completePhase(1);
         // All phases already completed
         planTool.failAllRemainingPhases();
@@ -238,7 +238,7 @@ class PlanToolTest {
 
     @Test
     void testFailAllRemainingPhases_AllFailed() {
-        planTool.createPlan("Task", new String[]{"Phase 1", "Phase 2"});
+        planTool.createPlanFromStrings("Task", new String[]{"Phase 1", "Phase 2"});
         planTool.failPhase(1);
         // Now: phase1=failed, phase2=pending
         planTool.failAllRemainingPhases();

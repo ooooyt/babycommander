@@ -125,7 +125,7 @@ public class PlanTool {
      * Backward-compatible overload for programmatic callers that pass single-string
      * phases (title and description both default to the given string).
      */
-    public String createPlan(String task, String[] phases) {
+    public String createPlanFromStrings(String task, String[] phases) {
         PhaseInput[] inputs = new PhaseInput[phases.length];
         for (int i = 0; i < phases.length; i++) {
             inputs[i] = new PhaseInput(phases[i]);
