@@ -254,8 +254,8 @@ class CodeGenLifecycleTest {
             skillDirs = stream.filter(Files::isDirectory).toList();
         }
         assertFalse(skillDirs.isEmpty(), "default skills should be copied into the skills directory");
-        assertTrue(Files.exists(skillsDir.resolve("example").resolve("SKILL.md")),
-            "the 'example' skill's SKILL.md should be copied");
+        assertTrue(Files.exists(skillsDir.resolve("refactor-large-codebase").resolve("SKILL.md")),
+            "the 'refactor-large-codebase' skill's SKILL.md should be copied");
     }
 
     @Test

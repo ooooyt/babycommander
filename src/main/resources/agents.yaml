@@ -1,58 +1,58 @@
-defaultModel: "${OPEN_TOASTER_DEFAULT_MODEL:openai}"
-workspaceRoot: "${OPEN_TOASTER_WORKSPACE_ROOT:/Users/yangtao/local-repo}"
-skipConfirmWorkspace: ${OPEN_TOASTER_SKIP_CONFIRM_WORKSPACE:false}
+defaultModel: "${BABY_COMMANDER_DEFAULT_MODEL:deepseek}"
+workspaceRoot: "${BABY_COMMANDER_WORKSPACE_ROOT:/Users/yangtao/local-repo}"
+skipConfirmWorkspace: ${BABY_COMMANDER_SKIP_CONFIRM_WORKSPACE:false}
 
 agentDefaults:
-  maxMessagesInMemory: ${OPEN_TOASTER_MAX_MESSAGES_IN_MEMORY:100}
-  maxToolCalls: ${OPEN_TOASTER_MAX_TOOL_CALLS:80}
-  temperature: ${OPEN_TOASTER_DEFAULT_TEMPERATURE:0.7}
-  toolOutputTruncationKB: ${OPEN_TOASTER_TOOL_OUTPUT_TRUNCATION_KB:5}
-  maxTokensInMemory: ${OPEN_TOASTER_MAX_TOKENS_IN_MEMORY:40000}
+  maxMessagesInMemory: ${BABY_COMMANDER_MAX_MESSAGES_IN_MEMORY:100}
+  maxToolCalls: ${BABY_COMMANDER_MAX_TOOL_CALLS:80}
+  temperature: ${BABY_COMMANDER_DEFAULT_TEMPERATURE:0.7}
+  toolOutputTruncationKB: ${BABY_COMMANDER_TOOL_OUTPUT_TRUNCATION_KB:5}
+  maxTokensInMemory: ${BABY_COMMANDER_MAX_TOKENS_IN_MEMORY:40000}
 
 providers:
   openai:
     type: openai
-    baseUrl: "${OPEN_TOASTER_OPENAI_BASE_URL:https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1}"
+    baseUrl: "${BABY_COMMANDER_OPENAI_BASE_URL:https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1}"
     apiKey: "${OPENAI_API_KEY}"
-    modelName: "${OPEN_TOASTER_OPENAI_MODEL:qwen3.8-max}"
-    temperature: ${OPEN_TOASTER_OPENAI_TEMPERATURE:0.7}
-    maxTokens: ${OPEN_TOASTER_OPENAI_MAX_TOKENS:30720}
-    timeoutSeconds: ${OPEN_TOASTER_OPENAI_TIMEOUT_SECONDS:300}
+    modelName: "${BABY_COMMANDER_OPENAI_MODEL:qwen3.8-max}"
+    temperature: ${BABY_COMMANDER_OPENAI_TEMPERATURE:0.7}
+    maxTokens: ${BABY_COMMANDER_OPENAI_MAX_TOKENS:30720}
+    timeoutSeconds: ${BABY_COMMANDER_OPENAI_TIMEOUT_SECONDS:300}
 
   anthropic:
     type: anthropic
     apiKey: "${ANTHROPIC_API_KEY}"
-    modelName: "${OPEN_TOASTER_ANTHROPIC_MODEL:claude-3-5-sonnet-20241022}"
-    temperature: ${OPEN_TOASTER_ANTHROPIC_TEMPERATURE:0.7}
-    maxTokens: ${OPEN_TOASTER_ANTHROPIC_MAX_TOKENS:8192}
-    timeoutSeconds: ${OPEN_TOASTER_ANTHROPIC_TIMEOUT_SECONDS:300}
+    modelName: "${BABY_COMMANDER_ANTHROPIC_MODEL:claude-3-5-sonnet-20241022}"
+    temperature: ${BABY_COMMANDER_ANTHROPIC_TEMPERATURE:0.7}
+    maxTokens: ${BABY_COMMANDER_ANTHROPIC_MAX_TOKENS:8192}
+    timeoutSeconds: ${BABY_COMMANDER_ANTHROPIC_TIMEOUT_SECONDS:300}
 
   ollama:
     type: ollama
-    baseUrl: "${OPEN_TOASTER_OLLAMA_BASE_URL:https://integrate.api.nvidia.com/v1}"
-    modelName: "${OPEN_TOASTER_OLLAMA_MODEL:meta/llama-3.3-70b-instruct}"
-    temperature: ${OPEN_TOASTER_OLLAMA_TEMPERATURE:0.7}
-    maxTokens: ${OPEN_TOASTER_OLLAMA_MAX_TOKENS:20480}
-    timeoutSeconds: ${OPEN_TOASTER_OLLAMA_TIMEOUT_SECONDS:300}
+    baseUrl: "${BABY_COMMANDER_OLLAMA_BASE_URL:https://integrate.api.nvidia.com/v1}"
+    modelName: "${BABY_COMMANDER_OLLAMA_MODEL:meta/llama-3.3-70b-instruct}"
+    temperature: ${BABY_COMMANDER_OLLAMA_TEMPERATURE:0.7}
+    maxTokens: ${BABY_COMMANDER_OLLAMA_MAX_TOKENS:20480}
+    timeoutSeconds: ${BABY_COMMANDER_OLLAMA_TIMEOUT_SECONDS:300}
     apiKey: "${OLLAMA_KEY}"
 
   deepseek:
     type: deepseek
-    baseUrl: "${OPEN_TOASTER_DEEPSEEK_BASE_URL:https://api.deepseek.com}"
+    baseUrl: "${BABY_COMMANDER_DEEPSEEK_BASE_URL:https://api.deepseek.com}"
     apiKey: "${DEEPSEEK_API_KEY}"
-    modelName: "${OPEN_TOASTER_DEEPSEEK_MODEL:deepseek-chat}"
-    temperature: ${OPEN_TOASTER_DEEPSEEK_TEMPERATURE:0.7}
-    maxTokens: ${OPEN_TOASTER_DEEPSEEK_MAX_TOKENS:30720}
-    timeoutSeconds: ${OPEN_TOASTER_DEEPSEEK_TIMEOUT_SECONDS:300}
+    modelName: "${BABY_COMMANDER_DEEPSEEK_MODEL:deepseek-chat}"
+    temperature: ${BABY_COMMANDER_DEEPSEEK_TEMPERATURE:0.7}
+    maxTokens: ${BABY_COMMANDER_DEEPSEEK_MAX_TOKENS:30720}
+    timeoutSeconds: ${BABY_COMMANDER_DEEPSEEK_TIMEOUT_SECONDS:300}
 
   qwen:
     type: openai
-    baseUrl: "${OPEN_TOASTER_QWEN_BASE_URL:https://coding.dashscope.aliyuncs.com/v1}"
+    baseUrl: "${BABY_COMMANDER_QWEN_BASE_URL:https://coding.dashscope.aliyuncs.com/v1}"
     apiKey: "${OPENAI_API_KEY}"
-    modelName: "${OPEN_TOASTER_QWEN_MODEL:qwen3.6-plus}"
-    temperature: ${OPEN_TOASTER_QWEN_TEMPERATURE:0.7}
-    maxTokens: ${OPEN_TOASTER_QWEN_MAX_TOKENS:20480}
-    timeoutSeconds: ${OPEN_TOASTER_QWEN_TIMEOUT_SECONDS:300}
+    modelName: "${BABY_COMMANDER_QWEN_MODEL:qwen3.6-plus}"
+    temperature: ${BABY_COMMANDER_QWEN_TEMPERATURE:0.7}
+    maxTokens: ${BABY_COMMANDER_QWEN_MAX_TOKENS:20480}
+    timeoutSeconds: ${BABY_COMMANDER_QWEN_TIMEOUT_SECONDS:300}
 
 mcp:
   servers: {}
