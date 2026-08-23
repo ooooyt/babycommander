@@ -110,7 +110,7 @@ public class EmbeddingService {
     }
 
     private boolean supportsEmbeddings(String type) {
-        return "openai".equals(type) || "deepseek".equals(type) || "ollama".equals(type);
+        return "openai".equals(type) || "ollama".equals(type);
     }
 
     private EmbeddingModel createEmbeddingModel(ProviderConfig c) {

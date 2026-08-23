@@ -40,7 +40,7 @@ providers:
     type: deepseek
     baseUrl: "${BABY_COMMANDER_DEEPSEEK_BASE_URL:https://api.deepseek.com}"
     apiKey: "${DEEPSEEK_API_KEY}"
-    modelName: "${BABY_COMMANDER_DEEPSEEK_MODEL:deepseek-chat}"
+    modelName: "${BABY_COMMANDER_DEEPSEEK_MODEL:deepseek-v4-flash}"
     temperature: ${BABY_COMMANDER_DEEPSEEK_TEMPERATURE:0.7}
     maxTokens: ${BABY_COMMANDER_DEEPSEEK_MAX_TOKENS:30720}
     timeoutSeconds: ${BABY_COMMANDER_DEEPSEEK_TIMEOUT_SECONDS:300}
@@ -52,6 +52,15 @@ providers:
     modelName: "${BABY_COMMANDER_QWEN_MODEL:qwen3.6-plus}"
     temperature: ${BABY_COMMANDER_QWEN_TEMPERATURE:0.7}
     maxTokens: ${BABY_COMMANDER_QWEN_MAX_TOKENS:20480}
+    timeoutSeconds: ${BABY_COMMANDER_QWEN_TIMEOUT_SECONDS:300}
+
+  opencode:
+    type: openai
+    baseUrl: "${BABY_COMMANDER_OC_BASE_URL:https://opencode.ai}"
+    apiKey: "${OPENCODE_API_KEY}"
+    modelName: "${BABY_COMMANDER_QWEN_MODEL:opencode-go/ox-alpha}"
+    temperature: ${BABY_COMMANDER_QWEN_TEMPERATURE:0.5}
+    maxTokens: ${BABY_COMMANDER_QWEN_MAX_TOKENS:30720}
     timeoutSeconds: ${BABY_COMMANDER_QWEN_TIMEOUT_SECONDS:300}
 
 mcp:

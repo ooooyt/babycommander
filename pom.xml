@@ -15,8 +15,8 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
-        <quarkus.platform.version>3.20.0</quarkus.platform.version>
-        <langchain4j.version>1.2.0</langchain4j.version>
+        <quarkus.platform.version>3.20.6.2</quarkus.platform.version>
+        <langchain4j.version>1.19.0</langchain4j.version>
         <skipITs>true</skipITs>
         <surefire-plugin.version>3.5.2</surefire-plugin.version>
         <antlr4.version>4.13.2</antlr4.version>
@@ -26,12 +26,54 @@
 
     <dependencyManagement>
         <dependencies>
+            <!-- Security patch: netty 4.1.137.Final fixes GHSA-c653-97m9-rcg9, GHSA-x4gw-5cx5-pgmh, GHSA-3qp7-7mw8-wx86,
+                 GHSA-6jqx-86gh-f27w, GHSA-8c42-7qj2-3j46 and other netty codec-http CVEs.
+                 Declared first so it takes precedence over vertx/quarkus-managed netty. -->
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>4.1.137.Final</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- Security patches: jackson 2.18.10 fixes GHSA-rmj7-2vxq-3g9f and related jackson-databind CVEs.
+                 Declared before vertx-dependencies so it wins over vertx-managed jackson 2.18.6. -->
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>2.18.10</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- Security patch: vertx 4.5.32 fixes GHSA-3g76-f9xq-8vp6 (SNI cache DoS) and
+                 CVE-2026-15075 / CVE-2026-15076 (WebClientSession cookie domain validation).
+                 Declared before quarkus-bom so its vertx modules take precedence over quarkus-managed 4.5.25. -->
+            <dependency>
+                <groupId>io.vertx</groupId>
+                <artifactId>vertx-dependencies</artifactId>
+                <version>4.5.32</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <dependency>
                 <groupId>${quarkus.platform.group-id}</groupId>
                 <artifactId>${quarkus.platform.artifact-id}</artifactId>
                 <version>${quarkus.platform.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <!-- Direct override: keep snakeyaml at the patched 2.3 (vertx-dependencies manages 2.0). -->
+            <dependency>
+                <groupId>org.yaml</groupId>
+                <artifactId>snakeyaml</artifactId>
+                <version>2.3</version>
+            </dependency>
+            <!-- Security patch: plexus-utils 4.0.3 fixes CVE-2025-67030 (Zip Slip in Expand.extractFile).
+                 Transitive via quarkus-junit5 test bootstrap (smallrye-beanbag-maven pulls 3.5.1). -->
+            <dependency>
+                <groupId>org.codehaus.plexus</groupId>
+                <artifactId>plexus-utils</artifactId>
+                <version>4.0.3</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -80,7 +122,7 @@
         <dependency>
             <groupId>org.jline</groupId>
             <artifactId>jline</artifactId>
-            <version>3.29.0</version>
+            <version>3.30.14</version>
         </dependency>
 
         <!-- CommonMark Markdown parser + GFM extensions -->
@@ -123,7 +165,7 @@
         <dependency>
             <groupId>org.jsoup</groupId>
             <artifactId>jsoup</artifactId>
-            <version>1.18.3</version>
+            <version>1.23.1</version>
         </dependency>
 
         <!-- ANTLR 4 for source code parsing (runtime only) -->
@@ -286,6 +328,22 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <!-- OWASP dependency-check: run explicitly with `mvn dependency-check:check`
+                 (no lifecycle binding, so it does not slow normal builds).
+                 suppressionFiles: filters known false positives.
+                 skipTestScope=false: scans test-scope transitive deps (e.g. quarkus-junit5 -> plexus-utils). -->
+            <plugin>
+                <groupId>org.owasp</groupId>
+                <artifactId>dependency-check-maven</artifactId>
+                <version>12.0.1</version>
+                <configuration>
+                    <skipTestScope>false</skipTestScope>
+                    <ossindexAnalyzerEnabled>false</ossindexAnalyzerEnabled>
+                    <suppressionFiles>
+                        <suppressionFile>${project.basedir}/dependency-check-suppressions.xml</suppressionFile>
+                    </suppressionFiles>
+                </configuration>
             </plugin>
         </plugins>
     </build>
