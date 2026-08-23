@@ -23,6 +23,12 @@ import java.util.Map;
 @ApplicationScoped
 public class EmbeddingService {
 
+    private static final String DEFAULT_OPENAI_EMBEDDING_MODEL = "text-embedding-3-small";
+    private static final String DEFAULT_OLLAMA_EMBEDDING_MODEL = "nomic-embed-text";
+
+    /** Set once so the "no embedding provider configured" hint is logged only on first use. */
+    private static volatile boolean noEmbeddingProviderLogged = false;
+
     @Inject
     YamlConfigLoader configLoader;
 
@@ -46,7 +52,13 @@ public class EmbeddingService {
 
         String providerName = resolveEmbeddingProvider(config);
         if (providerName == null) {
-            Log.warn("EmbeddingService: no provider supports embeddings, skipping embedding generation");
+            if (!noEmbeddingProviderLogged) {
+                noEmbeddingProviderLogged = true;
+                Log.warn("EmbeddingService: no provider declares an 'embeddingModel', skipping embedding "
+                        + "generation; semantic search will fall back to keyword search. To enable "
+                        + "embeddings, set 'embeddingModel' on an OpenAI-compatible or Ollama provider "
+                        + "in agents.yaml (the chat 'modelName' is never used for embeddings).");
+            }
             return null;
         }
 
@@ -67,14 +79,22 @@ public class EmbeddingService {
                 vector.length, truncate(text, 50));
             return vector;
         } catch (Exception e) {
-            Log.errorf(e, "EmbeddingService: failed to generate embedding for text: '%s'", truncate(text, 50));
+            // Embeddings are best-effort: callers (e.g. semantic task search) already fall back
+            // to keyword search when this returns null, so log a concise WARN instead of an ERROR
+            // stack trace on every task creation.
+            Log.warnf("EmbeddingService: failed to generate embedding for text: '%s' (%s); "
+                    + "falling back to keyword search",
+                truncate(text, 50),
+                e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
             return null;
         }
     }
 
     /**
      * Resolves the provider name to use for embeddings.
-     * Prefers providers that support embeddings (OpenAI-compatible, Ollama).
+     * Only providers that explicitly declare an {@code embeddingModel} on a type that
+     * supports embeddings are considered, so a provider's chat {@code modelName}
+     * (e.g. {@code qwen3.8-max}) is never mistaken for an embedding model.
      */
     private String resolveEmbeddingProvider(AgentConfig config) {
         // First, try the default model provider
@@ -82,7 +102,7 @@ public class EmbeddingService {
         if (defaultModel != null && !defaultModel.isBlank()
                 && config.providers != null && config.providers.containsKey(defaultModel)) {
             ProviderConfig pc = config.providers.get(defaultModel);
-            if (supportsEmbeddings(pc.type)) {
+            if (isEmbeddingProvider(pc)) {
                 return defaultModel;
             }
         }
@@ -92,15 +112,15 @@ public class EmbeddingService {
         if (defaultProvider != null && config.providers != null
                 && config.providers.containsKey(defaultProvider)) {
             ProviderConfig pc = config.providers.get(defaultProvider);
-            if (supportsEmbeddings(pc.type)) {
+            if (isEmbeddingProvider(pc)) {
                 return defaultProvider;
             }
         }
 
-        // Scan all providers for one that supports embeddings
+        // Scan all providers for one that supports embeddings with a declared model
         if (config.providers != null) {
             for (Map.Entry<String, ProviderConfig> entry : config.providers.entrySet()) {
-                if (supportsEmbeddings(entry.getValue().type)) {
+                if (isEmbeddingProvider(entry.getValue())) {
                     return entry.getKey();
                 }
             }
@@ -113,6 +133,11 @@ public class EmbeddingService {
         return "openai".equals(type) || "ollama".equals(type);
     }
 
+    private boolean isEmbeddingProvider(ProviderConfig c) {
+        return supportsEmbeddings(c.type)
+                && c.embeddingModel != null && !c.embeddingModel.isBlank();
+    }
+
     private EmbeddingModel createEmbeddingModel(ProviderConfig c) {
         Duration timeout = Duration.ofSeconds(c.timeoutSeconds > 0 ? c.timeoutSeconds : 60);
 
@@ -120,13 +145,13 @@ public class EmbeddingService {
             case "openai", "deepseek" -> OpenAiEmbeddingModel.builder()
                     .baseUrl(c.baseUrl)
                     .apiKey(c.apiKey)
-                    .modelName(c.modelName != null ? c.modelName : "text-embedding-3-small")
+                    .modelName(c.embeddingModel != null ? c.embeddingModel : DEFAULT_OPENAI_EMBEDDING_MODEL)
                     .timeout(timeout)
                     .maxRetries(1)
                     .build();
             case "ollama" -> OllamaEmbeddingModel.builder()
                     .baseUrl(c.baseUrl)
-                    .modelName(c.modelName != null ? c.modelName : "nomic-embed-text")
+                    .modelName(c.embeddingModel != null ? c.embeddingModel : DEFAULT_OLLAMA_EMBEDDING_MODEL)
                     .timeout(timeout)
                     .build();
             default -> {

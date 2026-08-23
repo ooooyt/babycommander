@@ -73,6 +73,15 @@ public class AgentConfig {
         @JsonProperty("modelName")
         public String modelName;
 
+        /**
+         * Optional dedicated embedding model name (e.g. {@code text-embedding-v4},
+         * {@code nomic-embed-text}). When set on an OpenAI-compatible or Ollama
+         * provider, EmbeddingService uses it to generate semantic-search vectors.
+         * The chat {@link #modelName} is never used for embeddings.
+         */
+        @JsonProperty("embeddingModel")
+        public String embeddingModel;
+
         @JsonProperty("temperature")
         public double temperature = 0.7;
 

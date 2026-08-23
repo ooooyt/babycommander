@@ -9,12 +9,19 @@ agentDefaults:
   toolOutputTruncationKB: ${BABY_COMMANDER_TOOL_OUTPUT_TRUNCATION_KB:5}
   maxTokensInMemory: ${BABY_COMMANDER_MAX_TOKENS_IN_MEMORY:40000}
 
+  # Embeddings (semantic task search) are only attempted when a provider declares an
+  # `embeddingModel`. Set it to a real embedding model on an OpenAI-compatible or
+  # Ollama provider, e.g. `text-embedding-v4` (DashScope) or `nomic-embed-text`
+  # (local Ollama). The chat `modelName` (e.g. qwen3.8-max) is never used for
+  # embeddings; if no provider declares `embeddingModel`, embeddings are skipped
+  # and search falls back to keyword matching.
 providers:
   openai:
     type: openai
     baseUrl: "${BABY_COMMANDER_OPENAI_BASE_URL:https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1}"
     apiKey: "${OPENAI_API_KEY}"
     modelName: "${BABY_COMMANDER_OPENAI_MODEL:qwen3.8-max}"
+    # embeddingModel: "text-embedding-v4"
     temperature: ${BABY_COMMANDER_OPENAI_TEMPERATURE:0.7}
     maxTokens: ${BABY_COMMANDER_OPENAI_MAX_TOKENS:30720}
     timeoutSeconds: ${BABY_COMMANDER_OPENAI_TIMEOUT_SECONDS:300}
