@@ -1,0 +1,197 @@
+// =============================================================================
+// babycommander - Gradle build script
+// Generated as a 1:1 equivalent of pom.xml so the project can be built with
+// `gradle build` instead of `mvn package`.
+// =============================================================================
+
+plugins {
+    id 'java'
+    id 'application'
+    id 'antlr'
+    id 'jacoco'
+    // ObjectBox must be applied before io.quarkus: the Quarkus plugin resolves
+    // the 'api' configuration during application, which breaks the ObjectBox
+    // plugin's eager dependency wiring on Gradle 8.x.
+    id 'io.objectbox' version '4.3.0'
+    id 'org.owasp.dependencycheck' version '12.0.1'
+    id 'io.quarkus' version '3.20.6.2'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // -------------------------------------------------------------------------
+    // BOM imports (pom.xml <dependencyManagement>).
+    // Security-patch BOMs (netty/jackson/vertx) are imported as *enforced*
+    // platforms so their versions win over the Quarkus-managed ones, mirroring
+    // Maven's "first declaration wins" import semantics. The Quarkus BOM is a
+    // regular platform so the patched versions above keep precedence.
+    // -------------------------------------------------------------------------
+    implementation enforcedPlatform('io.netty:netty-bom:4.1.137.Final')
+    implementation enforcedPlatform('com.fasterxml.jackson:jackson-bom:2.18.10')
+    implementation enforcedPlatform('io.vertx:vertx-dependencies:4.5.32')
+    implementation platform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}")
+
+    // Direct version overrides (pom.xml dependencyManagement direct entries)
+    implementation 'org.yaml:snakeyaml:2.3'
+    implementation 'org.codehaus.plexus:plexus-utils:4.0.3'
+
+    // -------------------------------------------------------------------------
+    // Quarkus extensions (versions managed by quarkus-bom)
+    // -------------------------------------------------------------------------
+    implementation 'io.quarkus:quarkus-rest'
+    implementation 'io.quarkus:quarkus-rest-jackson'
+    implementation 'io.quarkus:quarkus-arc'
+    implementation 'io.quarkus:quarkus-jackson'
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
+
+    // LangChain4j
+    implementation "dev.langchain4j:langchain4j:${langchain4jVersion}"
+    implementation "dev.langchain4j:langchain4j-open-ai:${langchain4jVersion}"
+    implementation "dev.langchain4j:langchain4j-anthropic:${langchain4jVersion}"
+    implementation "dev.langchain4j:langchain4j-ollama:${langchain4jVersion}"
+
+    // Terminal / parsing / misc runtime deps (pom.xml explicit versions)
+    implementation "org.jline:jline:${jlineVersion}"
+    implementation "org.commonmark:commonmark:${commonmarkVersion}"
+    implementation "org.commonmark:commonmark-ext-gfm-tables:${commonmarkVersion}"
+    implementation "org.commonmark:commonmark-ext-gfm-strikethrough:${commonmarkVersion}"
+    implementation "org.commonmark:commonmark-ext-task-list-items:${commonmarkVersion}"
+    implementation "org.fusesource.jansi:jansi:${jansiVersion}"
+    implementation "org.jsoup:jsoup:${jsoupVersion}"
+    implementation "org.antlr:antlr4-runtime:${antlr4Version}"
+
+    // Lombok (pom scope: provided -> compileOnly) + annotation processing
+    compileOnly "org.projectlombok:lombok:${lombokVersion}"
+    annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+
+    // -------------------------------------------------------------------------
+    // ObjectBox. The io.objectbox Gradle plugin adds the annotation processor and
+    // the current-platform native library automatically (equivalent to the
+    // objectbox-maven-plugin transform goal + processor); we also declare the JVM
+    // API and all platform natives explicitly to mirror the pom (multi-platform
+    // distribution, not just the current OS).
+    // -------------------------------------------------------------------------
+    implementation "io.objectbox:objectbox-java:${objectboxVersion}"
+    implementation "io.objectbox:objectbox-macos:${objectboxVersion}"
+    implementation "io.objectbox:objectbox-linux:${objectboxVersion}"
+    implementation "io.objectbox:objectbox-windows:${objectboxVersion}"
+    annotationProcessor "io.objectbox:objectbox-processor:${objectboxVersion}"
+
+    // ANTLR 4 grammar generation (built-in antlr plugin -> generateGrammarSource)
+    antlr "org.antlr:antlr4:${antlr4Version}"
+
+    // Test dependencies
+    testImplementation 'io.quarkus:quarkus-junit5'
+    testImplementation 'io.rest-assured:rest-assured'
+    testImplementation "org.mockito:mockito-core:${mockitoVersion}"
+    testImplementation "org.mockito:mockito-junit-jupiter:${mockitoVersion}"
+}
+
+// -----------------------------------------------------------------------------
+// Java compilation - mirrors maven-compiler-plugin configuration:
+//   <parameters>true</parameters>, <release>22</release>, encoding UTF-8,
+//   and the ObjectBox model path compiler arg.
+// -----------------------------------------------------------------------------
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = Integer.parseInt(compilerRelease)
+    options.compilerArgs += ['-parameters']
+    options.compilerArgs += ["-Aobjectbox.modelPath=${projectDir}/objectbox-models/default.json"]
+}
+
+// -----------------------------------------------------------------------------
+// ANTLR - the grammar lives in src/main/antlr4 (maven antlr4 plugin default);
+// the built-in antlr plugin defaults to src/main/antlr per source set, so point
+// the main source set's 'antlr' directory set at our location (replacing the
+// default, whose non-existent dir would otherwise break path resolution).
+// -----------------------------------------------------------------------------
+sourceSets {
+    main {
+        antlr {
+            srcDirs = ['src/main/antlr4']
+        }
+    }
+}
+
+// The built-in ANTLR worker does not infer a package from the grammar folder
+// (the Maven antlr4 plugin passes -package explicitly), so compute it from the
+// grammar's path relative to the antlr source dir and pass it to the tool.
+generateGrammarSource {
+    def grammarDir = file('src/main/antlr4')
+    def grammarFile = fileTree(grammarDir) { include '**/*.g4' }.files.find { it.name.endsWith('.g4') }
+    if (grammarFile != null) {
+        def pkg = grammarDir.relativePath(grammarFile.parentFile).replace(File.separator, '.')
+        if (pkg) {
+            arguments += ['-package', pkg]
+        }
+    }
+}
+// -----------------------------------------------------------------------------
+// Application entry point (pom.xml quarkus-maven-plugin builds a Quarkus app;
+// @QuarkusMain is on CodeGenApp). JVM args mirror the pom jvmArgs so `gradle run`
+// behaves like running the packaged app on modern JDKs.
+// -----------------------------------------------------------------------------
+application {
+    mainClass = 'com.ooooyt.babycommander.CodeGenApp'
+    applicationDefaultJvmArgs = [
+        '--add-opens=java.base/sun.misc=ALL-UNNAMED',
+        '--enable-native-access=ALL-UNNAMED',
+        '--sun-misc-unsafe-memory-access=allow'
+    ]
+}
+
+// -----------------------------------------------------------------------------
+// Quarkus dev mode - mirror the pom systemProperties/jvmArgs for quarkus:dev.
+// -----------------------------------------------------------------------------
+tasks.named('quarkusDev') {
+    jvmArgs = [
+        '--add-opens=java.base/sun.misc=ALL-UNNAMED',
+        '--enable-native-access=ALL-UNNAMED',
+        '--sun-misc-unsafe-memory-access=allow'
+    ]
+}
+
+// -----------------------------------------------------------------------------
+// Tests - mirror maven-surefire-plugin systemPropertyVariables.
+// (maven.home is not set: no source code reads it; the Quarkus test bootstrap
+// resolves the workspace via Gradle.)
+// -----------------------------------------------------------------------------
+test {
+    useJUnitPlatform()
+    systemProperty 'java.util.logging.manager', 'org.jboss.logmanager.LogManager'
+    systemProperty 'net.bytebuddy.experimental', 'true'
+    testLogging {
+        events 'failed', 'skipped'
+        exceptionFormat 'full'
+    }
+    finalizedBy jacocoTestReport
+}
+
+// -----------------------------------------------------------------------------
+// JaCoCo - mirror jacoco-maven-plugin 0.8.12 (prepare-agent + report after test)
+// -----------------------------------------------------------------------------
+jacoco {
+    toolVersion = '0.8.12'
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = false
+        html.required = true
+    }
+}
+
+// -----------------------------------------------------------------------------
+// OWASP dependency-check - run explicitly with `./gradlew dependencyCheckAnalyze`
+// (no lifecycle binding, mirrors `mvn dependency-check:check`). Suppression file
+// filters known false positives. The Gradle plugin scans all configurations
+// (including test-scope transitives, matching the pom's skipTestScope=false);
+// use `skipConfigurations` if you need to exclude any.
+// -----------------------------------------------------------------------------
+dependencyCheck {
+    suppressionFiles = ['dependency-check-suppressions.xml']
+}

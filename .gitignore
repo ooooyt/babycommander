@@ -1,5 +1,9 @@
 # Build output
 target/
+build/
+
+# Gradle
+.gradle/
 
 # IDE
 .idea/

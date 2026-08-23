@@ -1,0 +1,24 @@
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    resolutionStrategy {
+        eachPlugin {
+            // ObjectBox publishes objectbox-gradle-plugin but for some versions
+            // the plugin-marker artifact is missing; resolve the implementation
+            // module directly (harmless when the marker does exist).
+            if (requested.id.id == 'io.objectbox') {
+                useModule("io.objectbox:objectbox-gradle-plugin:${requested.version}")
+            }
+        }
+    }
+}
+
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'babycommander'

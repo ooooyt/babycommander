@@ -189,10 +189,13 @@ execution/plan normalization.
 ```
 babycommander/
 ├── pom.xml                  # Quarkus + LangChain4j + ObjectBox + ANTLR build
+├── build.gradle             # Gradle equivalent of pom.xml
+├── settings.gradle          # Gradle project settings
+├── gradle.properties        # Gradle build properties
+├── gradlew / gradlew.bat    # Gradle wrapper scripts
 ├── src/main/antlr4/         # Code-skeleton grammar
 ├── src/main/java/…          # Application sources (see Architecture)
 ├── src/main/resources/
-│   ├── agents.yaml          # Agent/provider configuration
 │   ├── hooks.yaml           # Tool safety rules
 │   ├── i18n/                # messages_en / messages_zh bundles
 │   └── skills/              # Bundled SKILL.md workflows
@@ -200,3 +203,39 @@ babycommander/
 ├── src/test/resources/      # Test config (application.properties)
 └── objectbox-models/        # ObjectBox data model
 ```
+
+## Building with Gradle
+
+`build.gradle` is a 1:1 equivalent of `pom.xml`, so the project can be built
+without Maven:
+
+```bash
+./gradlew build              # compile + test + Quarkus fast-jar (build/quarkus-app)
+./gradlew quarkusDev         # Quarkus dev mode (hot reload)
+./gradlew run                # run the application from source
+./gradlew test               # run unit tests only
+./gradlew dependencyCheckAnalyze   # OWASP dependency-check (explicit, like `mvn dependency-check:check`)
+```
+
+Requirements / notes:
+
+- **JDK 22+** is required to compile (`--release 22`, matching the
+  maven-compiler-plugin config). Quarkus 3.20 is tested with **Gradle 8.x**
+  (docs recommend 8.13); Gradle 8.x supports daemons on JDK 17-23, so run the
+  wrapper with a JDK 22/23 (`JAVA_HOME` or `org.gradle.java.home` in
+  `gradle.properties`) if your default JDK is newer.
+  Symptom of running the Gradle 8.13 daemon on JDK 24/25:
+  `Could not create task ':test'` -> `TypeNotPresentException: Type T not present`
+  at the `test { }` block (fix: point `org.gradle.java.home` at a JDK 22/23,
+  e.g. in `~/.gradle/gradle.properties`).
+- `gradle.properties` mirrors the pom's `quarkus-maven-plugin` `jvmArgs`
+  (`--sun-misc-unsafe-memory-access=allow` requires JDK 23+; drop it on older
+  JDKs).
+- The Quarkus platform BOM (`io.quarkus.platform:quarkus-bom:3.20.6.2`) plus the
+  security-patch BOMs (netty 4.1.137.Final, jackson 2.18.10, vertx 4.5.32) are
+  imported exactly as in the pom; the patch BOMs are enforced so they take
+  precedence over Quarkus-managed versions.
+- ANTLR grammar generation, Lombok/ObjectBox annotation processing and the
+  ObjectBox bytecode transformation are wired the same way as the Maven plugins
+  (ANTLR output: `build/generated-src/antlr/main`; ObjectBox model:
+  `objectbox-models/default.json`).
