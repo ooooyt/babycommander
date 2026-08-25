@@ -240,6 +240,24 @@ final class TuiEventInterpreter {
                 }
                 yield "";
             }
+            case THINKING_FAILED -> { isToolEvent = true;
+                // The LLM round-trip failed (e.g. timeout): stop the thinking
+                // animation and replace the placeholder with an error line so
+                // the UI does not appear hung while retries are exhausted.
+                synchronized (model.chatMessages) {
+                    model.chatMessages.removeIf(cm ->
+                        I18n.tr(MessageKey.STATUS_THINKING).equals(cm.source()));
+                    String failLine = I18n.tr(MessageKey.STATUS_THINKING_FAILED,
+                        event.getLong("elapsedMs", 0L));
+                    model.chatMessages.add(new ChatMessage(failLine, failLine,
+                        TerminalTheme.ST_TOOL_ERROR));
+                    model.chatVersion++;
+                }
+                model.thinking = false;
+                model.autoScroll = true;
+                model.dirty = true;
+                yield "";
+            }
         };
 
         AttributedStyle statusStyle = switch (type) {
@@ -249,6 +267,7 @@ final class TuiEventInterpreter {
             case TOOL_CALL_ERROR -> TerminalTheme.ST_TOOL_ERROR;
             case THINKING_DURATION -> TerminalTheme.ST_TIME;
             case THINKING_STARTED -> TerminalTheme.ST_TIME;
+            case THINKING_FAILED -> TerminalTheme.ST_TOOL_ERROR;
             default -> null;
         };
 

@@ -90,6 +90,14 @@ public class AgentConfig {
 
         @JsonProperty("timeoutSeconds")
         public int timeoutSeconds = 300;
+
+        /**
+         * Number of LLM request retries per round-trip (0 disables retries).
+         * LangChain4j defaults to 2; with long read timeouts that can leave
+         * callers hanging for many minutes after a failure.
+         */
+        @JsonProperty("maxRetries")
+        public int maxRetries = 2;
     }
 
     public static class McpConfig {

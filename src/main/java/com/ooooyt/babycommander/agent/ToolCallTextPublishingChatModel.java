@@ -46,7 +46,18 @@ public class ToolCallTextPublishingChatModel implements ChatModel {
             publisher.thinkingStarted();
         }
         long start = System.currentTimeMillis();
-        ChatResponse response = delegate.doChat(chatRequest);
+        ChatResponse response;
+        try {
+            response = delegate.doChat(chatRequest);
+        } catch (RuntimeException e) {
+            long durationMs = System.currentTimeMillis() - start;
+            if (publisher != null) {
+                // The round-trip failed: report it so the UI clears the
+                // "thinking..." placeholder instead of waiting forever.
+                publisher.thinkingFailed(durationMs);
+            }
+            throw e;
+        }
         long durationMs = System.currentTimeMillis() - start;
         publishToolCallText(response, durationMs);
         return response;

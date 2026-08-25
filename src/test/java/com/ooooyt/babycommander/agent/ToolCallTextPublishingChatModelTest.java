@@ -107,6 +107,34 @@ class ToolCallTextPublishingChatModelTest {
     }
 
     @Test
+    @DisplayName("Publishes thinkingFailed and rethrows when the delegate fails")
+    void publishesThinkingFailedWhenDelegateThrows() {
+        when(delegate.doChat(any(ChatRequest.class)))
+                .thenThrow(new RuntimeException("boom"));
+
+        ToolCallTextPublishingChatModel model = new ToolCallTextPublishingChatModel(delegate);
+        assertThrows(RuntimeException.class, () -> model.doChat(request()));
+
+        // The failure must be surfaced so the UI clears the "thinking..." placeholder
+        verify(publisher).thinkingFailed(anyLong());
+        // No tool call text is published for a failed round-trip
+        verify(publisher, never()).toolCallText(anyString(), anyString(), anyBoolean());
+    }
+
+    @Test
+    @DisplayName("Does not publish thinkingFailed outside an active status context")
+    void doesNotPublishThinkingFailedWithoutContext() {
+        context.deactivate();
+        when(delegate.doChat(any(ChatRequest.class)))
+                .thenThrow(new RuntimeException("boom"));
+
+        ToolCallTextPublishingChatModel model = new ToolCallTextPublishingChatModel(delegate);
+        assertThrows(RuntimeException.class, () -> model.doChat(request()));
+
+        verify(publisher, never()).thinkingFailed(anyLong());
+    }
+
+    @Test
     @DisplayName("Does not publish toolCallText for final answer without tool calls")
     void doesNotPublishToolCallTextForFinalAnswer() {
         AiMessage aiMessage = AiMessage.from("Here is the answer.");

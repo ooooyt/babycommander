@@ -25,3 +25,7 @@ objectbox-models/*.bak
 
 # OS
 .DS_Store
+
+# Scratch / debug artifacts
+dep-tree.txt
+docs/temp/

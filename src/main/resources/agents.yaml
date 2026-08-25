@@ -1,4 +1,4 @@
-defaultModel: "${BABY_COMMANDER_DEFAULT_MODEL:deepseek}"
+defaultModel: "${BABY_COMMANDER_DEFAULT_MODEL:opencode}"
 workspaceRoot: "${BABY_COMMANDER_WORKSPACE_ROOT:/Users/yangtao/local-repo}"
 skipConfirmWorkspace: ${BABY_COMMANDER_SKIP_CONFIRM_WORKSPACE:false}
 
@@ -20,10 +20,11 @@ providers:
     type: openai
     baseUrl: "${BABY_COMMANDER_OPENAI_BASE_URL:https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1}"
     apiKey: "${OPENAI_API_KEY}"
-    modelName: "${BABY_COMMANDER_OPENAI_MODEL:qwen3.8-max}"
+    modelName: "${BABY_COMMANDER_OPENAI_MODEL:glm-5.2}"
     # embeddingModel: "text-embedding-v4"
     temperature: ${BABY_COMMANDER_OPENAI_TEMPERATURE:0.7}
     maxTokens: ${BABY_COMMANDER_OPENAI_MAX_TOKENS:30720}
+    maxRetries: ${BABY_COMMANDER_MAX_RETRIES:2}
     timeoutSeconds: ${BABY_COMMANDER_OPENAI_TIMEOUT_SECONDS:300}
 
   anthropic:
@@ -31,6 +32,7 @@ providers:
     apiKey: "${ANTHROPIC_API_KEY}"
     modelName: "${BABY_COMMANDER_ANTHROPIC_MODEL:claude-3-5-sonnet-20241022}"
     temperature: ${BABY_COMMANDER_ANTHROPIC_TEMPERATURE:0.7}
+    maxRetries: ${BABY_COMMANDER_MAX_RETRIES:2}
     maxTokens: ${BABY_COMMANDER_ANTHROPIC_MAX_TOKENS:8192}
     timeoutSeconds: ${BABY_COMMANDER_ANTHROPIC_TIMEOUT_SECONDS:300}
 
@@ -38,6 +40,7 @@ providers:
     type: ollama
     baseUrl: "${BABY_COMMANDER_OLLAMA_BASE_URL:https://integrate.api.nvidia.com/v1}"
     modelName: "${BABY_COMMANDER_OLLAMA_MODEL:meta/llama-3.3-70b-instruct}"
+    maxRetries: ${BABY_COMMANDER_MAX_RETRIES:2}
     temperature: ${BABY_COMMANDER_OLLAMA_TEMPERATURE:0.7}
     maxTokens: ${BABY_COMMANDER_OLLAMA_MAX_TOKENS:20480}
     timeoutSeconds: ${BABY_COMMANDER_OLLAMA_TIMEOUT_SECONDS:300}
@@ -47,6 +50,7 @@ providers:
     type: deepseek
     baseUrl: "${BABY_COMMANDER_DEEPSEEK_BASE_URL:https://api.deepseek.com}"
     apiKey: "${DEEPSEEK_API_KEY}"
+    maxRetries: ${BABY_COMMANDER_MAX_RETRIES:2}
     modelName: "${BABY_COMMANDER_DEEPSEEK_MODEL:deepseek-v4-flash}"
     temperature: ${BABY_COMMANDER_DEEPSEEK_TEMPERATURE:0.7}
     maxTokens: ${BABY_COMMANDER_DEEPSEEK_MAX_TOKENS:30720}
@@ -55,6 +59,7 @@ providers:
   qwen:
     type: openai
     baseUrl: "${BABY_COMMANDER_QWEN_BASE_URL:https://coding.dashscope.aliyuncs.com/v1}"
+    maxRetries: ${BABY_COMMANDER_MAX_RETRIES:2}
     apiKey: "${OPENAI_API_KEY}"
     modelName: "${BABY_COMMANDER_QWEN_MODEL:qwen3.6-plus}"
     temperature: ${BABY_COMMANDER_QWEN_TEMPERATURE:0.7}
@@ -63,12 +68,13 @@ providers:
 
   opencode:
     type: openai
-    baseUrl: "${BABY_COMMANDER_OC_BASE_URL:https://opencode.ai}"
+    maxRetries: ${BABY_COMMANDER_MAX_RETRIES:2}
+    baseUrl: "${BABY_COMMANDER_OC_BASE_URL:https://opencode.ai/zen/go/v1}"
     apiKey: "${OPENCODE_API_KEY}"
-    modelName: "${BABY_COMMANDER_QWEN_MODEL:opencode-go/ox-alpha}"
-    temperature: ${BABY_COMMANDER_QWEN_TEMPERATURE:0.5}
-    maxTokens: ${BABY_COMMANDER_QWEN_MAX_TOKENS:30720}
-    timeoutSeconds: ${BABY_COMMANDER_QWEN_TIMEOUT_SECONDS:300}
+    modelName: "${BABY_COMMANDER_OC_MODEL:ox-alpha-free}"
+    temperature: ${BABY_COMMANDER_OC_TEMPERATURE:0.5}
+    maxTokens: ${BABY_COMMANDER_OC_MAX_TOKENS:30720}
+    timeoutSeconds: ${BABY_COMMANDER_OC_TIMEOUT_SECONDS:300}
 
 mcp:
   servers: {}

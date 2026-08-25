@@ -179,6 +179,7 @@ public class AgentFactory {
         searchConfig.temperature = 0.0;
         searchConfig.maxTokens = 1024;
         searchConfig.timeoutSeconds = providerConfig.timeoutSeconds;
+        searchConfig.maxRetries = providerConfig.maxRetries;
         return createModel(searchConfig);
     }
 
@@ -266,12 +267,14 @@ public class AgentFactory {
 
     private ChatModel createModel(AgentConfig.ProviderConfig c) {
         Duration timeout = Duration.ofSeconds(c.timeoutSeconds);
+        int maxRetries = resolveMaxRetries(c);
         ChatModel model = switch (c.type) {
             case "openai" -> OpenAiChatModel.builder()
                     .baseUrl(c.baseUrl == null || c.baseUrl.isEmpty() ? null : c.baseUrl)
                     .apiKey(c.apiKey)
                     .modelName(c.modelName)
                     .temperature(c.temperature)
+                    .maxRetries(maxRetries)
                     .maxTokens(c.maxTokens)
                     .timeout(timeout)
                     .returnThinking(false)
@@ -280,6 +283,7 @@ public class AgentFactory {
                     .baseUrl(c.baseUrl)
                     .apiKey(c.apiKey)
                     .modelName(c.modelName)
+                    .maxRetries(maxRetries)
                     .temperature(c.temperature)
                     .maxTokens(c.maxTokens)
                     .timeout(timeout)
@@ -304,5 +308,15 @@ public class AgentFactory {
         // Wrap so that descriptive text accompanying tool-call requests is
         // surfaced as a TOOL_CALL_TEXT status event before the tools run.
         return new ToolCallTextPublishingChatModel(model);
+    }
+
+    /**
+     * Resolves the number of LLM request retries from config (clamped to a sane
+     * range). With long read timeouts, langchain4j's default of 2 retries can
+     * leave the UI hanging for many minutes after a timeout; keeping retries
+     * low bounds worst-case latency. 0 disables retries entirely.
+     */
+    private static int resolveMaxRetries(ProviderConfig c) {
+        return Math.max(0, Math.min(c.maxRetries, 5));
     }
 }

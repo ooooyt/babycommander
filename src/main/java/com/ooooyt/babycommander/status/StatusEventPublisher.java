@@ -91,6 +91,16 @@ public class StatusEventPublisher {
             .put("thinkingMs", thinkingMs));
     }
 
+    /**
+     * Signals that an LLM round-trip failed (e.g. read timeout after internal
+     * retries were exhausted), so consumers can clear the "thinking..."
+     * placeholder instead of leaving it stuck forever.
+     */
+    public void thinkingFailed(long elapsedMs) {
+        publish(StatusEventType.THINKING_FAILED, b -> b
+            .put("elapsedMs", elapsedMs));
+    }
+
     public void toolCallResult(String stepId, String toolName, String toolInput, String toolOutput, long durationMs) {
         publish(StatusEventType.TOOL_CALL_RESULT, b -> b
             .put("stepId", stepId)

@@ -9,7 +9,7 @@ class StatusEventTypeTest {
     @Test
     void testAllValues() {
         StatusEventType[] values = StatusEventType.values();
-        assertEquals(13, values.length);
+        assertEquals(14, values.length);
     }
 
     @Test
@@ -25,6 +25,7 @@ class StatusEventTypeTest {
         assertFalse(StatusEventType.TOOL_CALL_ERROR.isActive());
         assertFalse(StatusEventType.THINKING_DURATION.isActive());
         assertFalse(StatusEventType.THINKING_STARTED.isActive());
+        assertFalse(StatusEventType.THINKING_FAILED.isActive());
     }
 
     @Test

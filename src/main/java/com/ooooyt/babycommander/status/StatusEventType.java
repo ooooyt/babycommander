@@ -13,7 +13,8 @@ public enum StatusEventType {
     TOOL_CALL_RESULT,
     TOOL_CALL_ERROR,
     THINKING_STARTED,
-    THINKING_DURATION;
+    THINKING_DURATION,
+    THINKING_FAILED;
 
     public boolean isActive() {
         return this == STEP_STARTED || this == TOOL_CALL_START;

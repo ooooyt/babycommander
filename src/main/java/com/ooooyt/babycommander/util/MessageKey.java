@@ -13,6 +13,8 @@ public enum MessageKey {
     CHAT_GOODBYE("chat.goodbye", "\\nGoodbye!"),
     CHAT_ERROR_TOOL_DENIED("chat.error.tool_denied", "Tool denied: {0}"),
     CHAT_ERROR_GENERIC("chat.error.generic", "Error: {0}"),
+    CHAT_ERROR_TIMEOUT("chat.error.timeout", "LLM request timed out after {0}s. "
+        + "Increase 'timeoutSeconds' or lower 'maxRetries' in agents.yaml, then retry."),
 
     // --- Workflow ---
     CHAT_WORKFLOW_STARTED("chat.workflow.started", "\\n--- Mode: {0} ---"),
@@ -108,6 +110,7 @@ public enum MessageKey {
     STATUS_STEP_FAILED("status.step.failed", "\u2717 {0} Failed"),
     STATUS_WORKFLOW_COMPLETED("status.workflow.completed", "\u2550\u2550\u2550 Workflow Completed: {0} ({1}) \u2550\u2550\u2550"),
     STATUS_THINKING("status.thinking", "  \u23F1  thinking..."),
+    STATUS_THINKING_FAILED("status.thinking_failed", "  \u2717 LLM request failed after {0}ms (timeout or connection error)"),
     // --- TUI status lines ---
     TUI_STEP_COMPLETE("tui.step.complete", "\u2713 {0} Complete ({1}ms)"),
     TUI_STEP_FAILED("tui.step.failed", "\u2717 {0} Failed \u2014 {1}"),

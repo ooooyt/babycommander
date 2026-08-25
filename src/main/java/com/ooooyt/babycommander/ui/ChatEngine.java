@@ -4,6 +4,7 @@ import com.ooooyt.babycommander.agent.AgentContext;
 import com.ooooyt.babycommander.agent.AgentFactory;
 import com.ooooyt.babycommander.agent.memory.ToolCallAwareChatMemory;
 import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.exception.TimeoutException;
 import com.ooooyt.babycommander.hook.HookManager;
 import com.ooooyt.babycommander.hook.ToolDeniedException;
 import com.ooooyt.babycommander.skill.SkillRegistry;
@@ -290,6 +291,13 @@ public class ChatEngine {
                             new UiEvent.MessageOutput(response, MessageType.MARKDOWN, durationMs));
                         completedSuccessfully = true;
                     }
+                } catch (dev.langchain4j.exception.TimeoutException e) {
+                    long durationMs = System.currentTimeMillis() - thinkStart;
+                    Log.errorf("Chat mode: LLM request timed out after %dms", durationMs);
+                    ctx.eventBus().publish(UI_EVENT_ADDRESS,
+                        new UiEvent.MessageOutput(
+                            I18n.tr(MessageKey.CHAT_ERROR_TIMEOUT, durationMs / 1000),
+                            MessageType.PLAIN, durationMs));
                 } catch (ToolDeniedException e) {
                     long durationMs = System.currentTimeMillis() - thinkStart;
                     ctx.eventBus().publish(UI_EVENT_ADDRESS,

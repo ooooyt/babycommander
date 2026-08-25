@@ -31,6 +31,7 @@ import dev.langchain4j.model.output.TokenUsage;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import dev.langchain4j.internal.RetryUtils;
 
 import static dev.langchain4j.internal.Utils.isNullOrBlank;
 
@@ -51,14 +52,14 @@ public class DeepSeekChatModel implements ChatModel {
     }
 
     @Builder(builderClassName = "ModelBuilder", builderMethodName = "builder")
-    private static DeepSeekChatModel create(String baseUrl, String apiKey, String modelName, Double temperature, Integer maxTokens, Duration timeout) {
+    private static DeepSeekChatModel create(String baseUrl, String apiKey, String modelName, Double temperature, Integer maxTokens, Duration timeout, Integer maxRetries) {
         OpenAiClient client = OpenAiClient.builder()
                 .baseUrl(baseUrl)
                 .apiKey(apiKey)
                 .connectTimeout(getOrDefault(timeout, Duration.ofSeconds(15)))
                 .readTimeout(getOrDefault(timeout, Duration.ofSeconds(60)))
                 .build();
-        return new DeepSeekChatModel(client, 2, modelName, temperature, maxTokens);
+        return new DeepSeekChatModel(client, getOrDefault(maxRetries, 2), modelName, temperature, maxTokens);
     }
 
     private static <T> T getOrDefault(T value, T defaultValue) {
@@ -79,7 +80,8 @@ public class DeepSeekChatModel implements ChatModel {
 
         ChatCompletionRequest openAiRequest = requestBuilder.build();
 
-        ChatCompletionResponse openAiResponse = client.chatCompletion(openAiRequest).execute();
+        ChatCompletionResponse openAiResponse = RetryUtils.withRetryMappingExceptions(
+                () -> client.chatCompletion(openAiRequest).execute(), maxRetries);
 
         AssistantMessage assistant = openAiResponse.choices().get(0).message();
         String text = assistant.content();
