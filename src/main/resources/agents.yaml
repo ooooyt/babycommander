@@ -1,4 +1,4 @@
-defaultModel: "${BABY_COMMANDER_DEFAULT_MODEL:opencode}"
+defaultModel: "${BABY_COMMANDER_DEFAULT_MODEL:ocdeepseek}"
 workspaceRoot: "${BABY_COMMANDER_WORKSPACE_ROOT:/Users/yangtao/local-repo}"
 skipConfirmWorkspace: ${BABY_COMMANDER_SKIP_CONFIRM_WORKSPACE:false}
 
@@ -56,6 +56,16 @@ providers:
     maxTokens: ${BABY_COMMANDER_DEEPSEEK_MAX_TOKENS:30720}
     timeoutSeconds: ${BABY_COMMANDER_DEEPSEEK_TIMEOUT_SECONDS:300}
 
+  ocdeepseek:
+    type: deepseek
+    baseUrl: "${BABY_COMMANDER_DEEPSEEK_BASE_URL:https://opencode.ai/zen/go/v1}"
+    apiKey: "${OPENCODE_API_KEY}"
+    maxRetries: ${BABY_COMMANDER_MAX_RETRIES:3}
+    modelName: "${BABY_COMMANDER_DEEPSEEK_MODEL:deepseek-v4-flash}"
+    temperature: ${BABY_COMMANDER_DEEPSEEK_TEMPERATURE:0.5}
+    maxTokens: ${BABY_COMMANDER_DEEPSEEK_MAX_TOKENS:30720}
+    timeoutSeconds: ${BABY_COMMANDER_DEEPSEEK_TIMEOUT_SECONDS:300}
+
   qwen:
     type: openai
     baseUrl: "${BABY_COMMANDER_QWEN_BASE_URL:https://coding.dashscope.aliyuncs.com/v1}"
@@ -71,7 +81,7 @@ providers:
     maxRetries: ${BABY_COMMANDER_MAX_RETRIES:2}
     baseUrl: "${BABY_COMMANDER_OC_BASE_URL:https://opencode.ai/zen/go/v1}"
     apiKey: "${OPENCODE_API_KEY}"
-    modelName: "${BABY_COMMANDER_OC_MODEL:ox-alpha-free}"
+    modelName: "${BABY_COMMANDER_OC_MODEL:gpt-5.6-luna}"
     temperature: ${BABY_COMMANDER_OC_TEMPERATURE:0.5}
     maxTokens: ${BABY_COMMANDER_OC_MAX_TOKENS:30720}
     timeoutSeconds: ${BABY_COMMANDER_OC_TIMEOUT_SECONDS:300}

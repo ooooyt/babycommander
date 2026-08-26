@@ -332,17 +332,16 @@ class HookManagerTest {
     // ========== Pattern Matching Tests ==========
 
     @Test
-    void testDangerousDowngradesToAskOnceWhenCommandMatchesPattern() throws Exception {
+    void testAskOncePatternDoesNotForcePromptForSafeCommand() throws Exception {
         setupPattern("java", "ShellTool", "ask_once", List.of("^mvn\\s"));
 
         String result = hookManager.onToolCall("ShellTool", "execute",
                 new Object[]{"mvn test"}, "s1", okCall());
         assertEquals("ok", result);
-        assertEquals(1, testHandler.callCount);
-        assertEquals(DangerLevel.ASK_ONCE, testHandler.lastInfo.level());
-        assertEquals("mvn test", testHandler.lastInfo.args()[0]);
+        // 'mvn test' is benign; token analysis classifies it SAFE even though an
+        // 'ask_once' pattern matches, so no confirmation is requested.
+        assertEquals(0, testHandler.callCount);
     }
-
     @Test
     void testDangerousStaysDangerousWhenCommandDoesNotMatchPattern() throws Exception {
         setupPattern("java", "ShellTool", "ask_once", List.of("^mvn\\s"));
@@ -355,11 +354,25 @@ class HookManagerTest {
     }
 
     @Test
-    void testNoPatternsKeepsExistingBehavior() throws Exception {
+    void testNoPatternsFallsBackToTokenAnalysis() throws Exception {
         config.hooks.patterns = null;
 
+        // 'mvn test' is a benign build command classified SAFE by token analysis,
+        // so no confirmation is requested.
         String result = hookManager.onToolCall("ShellTool", "execute",
                 new Object[]{"mvn test"}, "s1", okCall());
+        assertEquals("ok", result);
+        assertEquals(0, testHandler.callCount);
+    }
+
+    @Test
+    void testNoPatternsDangerousCommandStillPrompts() throws Exception {
+        config.hooks.patterns = null;
+
+        // 'rm -rf' is destructive, so token analysis flags it DANGEROUS and
+        // confirmation is requested.
+        String result = hookManager.onToolCall("ShellTool", "execute",
+                new Object[]{"rm -rf /tmp/foo"}, "s1", okCall());
         assertEquals("ok", result);
         assertEquals(1, testHandler.callCount);
         assertEquals(DangerLevel.DANGEROUS, testHandler.lastInfo.level());
@@ -382,25 +395,24 @@ class HookManagerTest {
         "common, ^ls\\s,    ls -la",
         "common, ^grep\\s,  grep foo bar.txt"
     })
-    void testCommandMatchesPattern(String groupName, String pattern, String command) throws Exception {
+    void testCommonCommandsAreSafe(String groupName, String pattern, String command) throws Exception {
         setupPattern(groupName, "ShellTool", "ask_once", List.of(pattern));
 
         String result = hookManager.onToolCall("ShellTool", "execute",
                 new Object[]{command}, "s1", okCall());
         assertEquals("ok", result);
-        assertEquals(1, testHandler.callCount);
-        assertEquals(DangerLevel.ASK_ONCE, testHandler.lastInfo.level());
+        // These are benign commands; token analysis auto-allows them.
+        assertEquals(0, testHandler.callCount);
     }
 
     @Test
-    void testChainedCommandMatchesCommonPattern() throws Exception {
+    void testChainedSafeCommandIsSafe() throws Exception {
         setupPattern("common", "ShellTool", "ask_once", List.of("^cd\\s.*&&"));
 
         String result = hookManager.onToolCall("ShellTool", "execute",
                 new Object[]{"cd /home && ls"}, "s1", okCall());
         assertEquals("ok", result);
-        assertEquals(1, testHandler.callCount);
-        assertEquals(DangerLevel.ASK_ONCE, testHandler.lastInfo.level());
+        assertEquals(0, testHandler.callCount);
     }
 
     // ========== Session / ThreadLocal Tests ==========
@@ -501,7 +513,7 @@ class HookManagerTest {
         setupRule("ShellTool", "dangerous");
         testHandler.nextResult = ConfirmationResult.ALLOW;
 
-        Object[] args = new Object[]{"mvn test"};
+        Object[] args = new Object[]{"rm -rf /tmp/foo"};
         hookManager.enterSession("s1");
         try {
             sessionMemory.markMethodAllowed("s1", "ShellTool", "execute");
@@ -596,9 +608,9 @@ class HookManagerTest {
 
         sessionMemory.addTrustedPaths("s1", List.of("src"));
 
-        // "cat /ws/src/main/Foo.java" — descendant of "src", should skip via path trust
+        // "touch /ws/src/main/Foo.java" — descendant of "src", should skip via path trust
         testHandler.callCount = 0;
-        Object[] args = new Object[]{"cat /ws/src/main/Foo.java"};
+        Object[] args = new Object[]{"touch /ws/src/main/Foo.java"};
         String result = hookManager.onToolCall("ShellTool", "execute",
                 args, "s1", okCall());
         assertEquals("ok", result);
@@ -633,7 +645,7 @@ class HookManagerTest {
         config.workspaceRoot = "/ws";
         testHandler.nextResult = ConfirmationResult.ALLOW_ALWAYS;
 
-        Object[] args = new Object[]{"cat /ws/src/main/Foo.java"};
+        Object[] args = new Object[]{"touch /ws/src/main/Foo.java"};
         hookManager.onToolCall("ShellTool", "execute",
                 args, "s1", okCall());
 
@@ -759,7 +771,7 @@ class HookManagerTest {
         // ShellTool touching the same path — tool name is part of the key
         testHandler.callCount = 0;
         hookManager.onToolCall("ShellTool", "execute",
-                new Object[]{"cat /proj/src/Foo.java"}, "s1", okCall());
+                new Object[]{"touch /proj/src/Foo.java"}, "s1", okCall());
         assertEquals(1, testHandler.callCount, "Other tool still prompts for same path");
     }
 

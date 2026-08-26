@@ -108,13 +108,24 @@ environment variables:
 
 ### `hooks.yaml` — tool safety levels
 
-Each tool call is classified by regex pattern matching:
+Each tool call is classified by regex pattern matching, and shell commands are
+additionally analyzed **token by token** (`ShellCommandAnalyzer`). The token
+analyzer splits a command into sub-commands at shell operators (`&&`, `||`, `;`,
+`|`) and inspects each command name and flag, so a destructive command hidden in
+the middle of a chain (e.g. `cd /tmp && rm -rf .`) is still caught, while benign
+commands are auto-allowed.
 
 - **safe** — read-only commands (`ls`, `pwd`, `head`, `wc`, …) execute silently
-- **ask_once** — build/dev commands (`mvn`, `npm`, `git`, `mkdir`, …) require one-time confirmation
-- **dangerous** — destructive operations (`rm -rf`, `sudo`, `dd`, `shutdown`, `DROP TABLE`, …) are gated
+- **safe** — benign build/dev/read commands (`mvn test`, `npm run`, `git status`,
+  `cat`, `grep`, `cd`, …) are auto-allowed by token analysis and run silently
+- **ask_once** — unclassified or side-effecting commands require confirmation
+- **dangerous** — destructive operations (`rm -rf`, `sudo`, `dd`, `shutdown`,
+  `DROP TABLE`, …) are gated
 
-Custom rules and patterns can be added under `rules:` and `patterns:`.
+Custom rules and patterns can be added under `rules:` and `patterns:`. For shell
+commands, `dangerous` and `safe` patterns remain authoritative overrides; the
+token analyzer is the primary classifier and supersedes `ask_once` patterns, so
+benign commands no longer prompt on every continued execution.
 
 ### In-scope auto-trust (`trustProject`)
 

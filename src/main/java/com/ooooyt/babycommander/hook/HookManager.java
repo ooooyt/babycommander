@@ -385,7 +385,12 @@ public class HookManager {
      * <ol>
      *   <li>Determine the tool-level baseline from hook rules (or SAFE if no rule matches).</li>
      *   <li>Check all command-content patterns — any matching pattern contributes its level.</li>
-     *   <li>Return the maximum (most restrictive) level across baseline and all matching patterns.</li>
+     *   <li>If a pattern matched, return the most restrictive level across baseline and patterns.</li>
+     *   <li>Otherwise, for {@code ShellTool}, fall back to token-based analysis
+     *       ({@link ShellCommandAnalyzer}) to classify the command by inspecting
+     *       each token/sub-command. This reduces confirmation fatigue for benign
+     *       commands (e.g. {@code git status}, {@code mvn test}) while still
+     *       flagging destructive ones as {@code DANGEROUS}.</li>
      * </ol>
      *
      * This means a {@code dangerous} pattern match <strong>escalates</strong> to DANGEROUS even if
@@ -454,6 +459,18 @@ public class HookManager {
             }
         }
 
+        // For ShellTool, token-based analysis is the primary classifier. Only
+        // 'dangerous' and 'safe' content patterns remain authoritative overrides;
+        // 'ask_once' patterns are superseded so benign commands (e.g. 'mvn test',
+        // 'cat file') are auto-allowed instead of prompting every time.
+        if ("ShellTool".equals(toolName) && command != null) {
+            if (matched == DangerLevel.DANGEROUS || matched == DangerLevel.SAFE) {
+                return matched;
+            }
+            return ShellCommandAnalyzer.analyze(command);
+        }
+
+        // Non-shell tools: a matched content pattern is authoritative, else baseline.
         return matched != null ? matched : baseline;
     }
 
