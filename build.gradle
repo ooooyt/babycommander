@@ -171,10 +171,10 @@ test {
 }
 
 // -----------------------------------------------------------------------------
-// JaCoCo - mirror jacoco-maven-plugin 0.8.12 (prepare-agent + report after test)
+// JaCoCo - mirror jacoco-maven-plugin 0.8.14 (prepare-agent + report after test)
 // -----------------------------------------------------------------------------
 jacoco {
-    toolVersion = '0.8.12'
+    toolVersion = '0.8.14'
 }
 
 jacocoTestReport {
