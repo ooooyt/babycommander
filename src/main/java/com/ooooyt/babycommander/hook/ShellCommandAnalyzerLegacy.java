@@ -45,7 +45,31 @@ public final class ShellCommandAnalyzerLegacy {
             "git", "mvn", "gradle", "npm", "npx", "yarn", "pnpm", "node",
             "python", "python3", "pip", "pip3", "java", "javac", "jar", "go", "gofmt",
             "cargo", "rustc", "rustup", "bundle", "rake", "gem", "ruby",
-            "composer", "php", "tsc", "bun", "curl", "wget"
+            "composer", "php", "tsc", "bun", "curl", "wget",
+            // Read-only filters / pipeline utilities
+            "tee", "sed", "awk", "gawk", "mawk", "jq", "less", "more", "cut",
+            "column", "paste", "tr", "nl", "od", "hexdump", "xxd", "strings",
+            "comm", "join", "look", "ptx", "tsort", "pr", "fmt", "numfmt",
+            "factor", "tac", "rev", "shuf", "split", "csplit", "sum", "expand",
+            "unexpand", "fold", "xargs", "timeout", "stdbuf", "envsubst",
+            "watch", "time",
+            // Read-only system info
+            "du", "df", "stat", "file", "basename", "dirname", "realpath",
+            "readlink", "md5sum", "sha1sum", "sha256sum", "sha512sum", "cksum",
+            "uptime", "free", "ps", "top", "htop", "lsof", "ss", "netstat",
+            "nproc", "getconf",
+            // Logic / benign utilities
+            "expr", "test", "true", "false", "sleep", "seq", "yes",
+            // Build tools
+            "make", "cmake", "ninja", "meson", "sbt", "dotnet"
+    );
+
+    /**
+     * Shells that execute code (used by the xargs guard: piping into a shell
+     * via xargs is treated as dangerous).
+     */
+    private static final Set<String> SHELL_EXECUTORS = Set.of(
+            "bash", "sh", "dash", "zsh", "ksh", "fish"
     );
 
     private ShellCommandAnalyzerLegacy() {
@@ -341,6 +365,40 @@ public final class ShellCommandAnalyzerLegacy {
         if (command.equals("rm")) {
             for (String t : tokens) {
                 if (t.equals("-rf") || t.equals("-fr") || t.equals("-r") || t.equals("-f")) {
+                    return true;
+                }
+            }
+        }
+        // sed in-place edits modify files.
+        if (command.equals("sed")) {
+            for (String t : tokens) {
+                if (t.equals("-i") || t.equals("--in-place")) {
+                    return true;
+                }
+            }
+        }
+        // tee writing to a system path (e.g. tee /etc/passwd).
+        if (command.equals("tee")) {
+            for (String t : tokens) {
+                if (isSystemPath(t)) {
+                    return true;
+                }
+            }
+        }
+        // xargs executing a dangerous command (e.g. xargs rm -rf, xargs sudo).
+        if (command.equals("xargs")) {
+            for (int i = 1; i < tokens.size(); i++) {
+                String t = tokens.get(i);
+                if (DANGEROUS_COMMANDS.contains(t) || t.equals("sudo")
+                        || SHELL_EXECUTORS.contains(t)) {
+                    return true;
+                }
+            }
+        }
+        // awk/gawk/mawk with system() code execution.
+        if (command.equals("awk") || command.equals("gawk") || command.equals("mawk")) {
+            for (String t : tokens) {
+                if (t.contains("system(")) {
                     return true;
                 }
             }

@@ -57,7 +57,26 @@ class ShGuardTest {
         "php artisan --version",
         "tsc --noEmit",
         "curl -I https://example.com",
-        "wget --spider https://example.com"
+        "wget --spider https://example.com",
+        // Build/vcs pipelines with common read-only filters are auto-allowed.
+        "mvn test | tee build.log",
+        "mvn test 2>&1 | tee build.log",
+        "mvn test | grep -i fail | head -20",
+        "mvn test | xargs echo",
+        "mvn test | sed -n '1p'",
+        "mvn test | awk '{print $1}'",
+        "mvn test | jq .",
+        "git log --oneline | less",
+        "git diff | column -t",
+        "git status --porcelain | awk '{print $2}'",
+        "git log --oneline | cut -d' ' -f1",
+        "git status | sort | uniq -c",
+        "git push origin main | tee push.log",
+        "git commit -m 'msg' && git push origin main",
+        "time mvn test",
+        "make -j4",
+        "du -sh .",
+        "stat -f src"
     })
     void testSafeCommands(String command) {
         assertEquals(DangerLevel.SAFE, ShGuard.analyze(command), command);
@@ -98,10 +117,23 @@ class ShGuardTest {
         "chown root:root /etc",
         "drop database mydb",
         "drop table users",
-        "truncate table logs"
+        "truncate table logs",
+        // Dangerous modes of newly-safe filter commands.
+        "sed -i 's/x/y/' file",
+        "sed --in-place 's/x/y/' file",
+        "tee /etc/passwd",
+        "echo hi | xargs rm -rf",
+        "xargs sudo rm -rf",
+        "find . -print0 | xargs -0 rm"
     })
     void testDangerousCommands(String command) {
         assertEquals(DangerLevel.DANGEROUS, ShGuard.analyze(command), command);
+    }
+
+    @Test
+    void testAwkSystemExecutionIsDangerous() {
+        assertEquals(DangerLevel.DANGEROUS,
+                ShGuard.analyze("awk 'BEGIN{system(\"rm -rf /\")}'"));
     }
 
     @Test

@@ -154,7 +154,23 @@ public final class ShGuardPolicy {
                 "git", "mvn", "gradle", "npm", "npx", "yarn", "pnpm", "node",
                 "python", "python3", "pip", "pip3", "java", "javac", "jar", "go", "gofmt",
                 "cargo", "rustc", "rustup", "bundle", "rake", "gem", "ruby",
-                "composer", "php", "tsc", "bun", "curl", "wget"
+                "composer", "php", "tsc", "bun", "curl", "wget",
+                // Read-only filters / pipeline utilities
+                "tee", "sed", "awk", "gawk", "mawk", "jq", "less", "more", "cut",
+                "column", "paste", "tr", "nl", "od", "hexdump", "xxd", "strings",
+                "comm", "join", "look", "ptx", "tsort", "pr", "fmt", "numfmt",
+                "factor", "tac", "rev", "shuf", "split", "csplit", "sum", "expand",
+                "unexpand", "fold", "xargs", "timeout", "stdbuf", "envsubst",
+                "watch", "time",
+                // Read-only system info
+                "du", "df", "stat", "file", "basename", "dirname", "realpath",
+                "readlink", "md5sum", "sha1sum", "sha256sum", "sha512sum", "cksum",
+                "uptime", "free", "ps", "top", "htop", "lsof", "ss", "netstat",
+                "nproc", "getconf",
+                // Logic / benign utilities
+                "expr", "test", "true", "false", "sleep", "seq", "yes",
+                // Build tools
+                "make", "cmake", "ninja", "meson", "sbt", "dotnet"
         );
 
         private Set<String> systemPathPrefixes = Set.of(

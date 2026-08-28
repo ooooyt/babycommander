@@ -142,9 +142,9 @@ class HookManagerTrustProjectTest {
     void testShellCommandNoPathsIsOutOfScope() throws Exception {
         // A command with no extractable paths is conservatively out-of-scope
         setupPattern("java", "ShellTool", "ask_once", List.of("^mvn\\s"));
-        // 'make build' has no path tokens and is ASK_ONCE -> out-of-scope -> prompt
+        // an unknown command has no path tokens and is ASK_ONCE -> out-of-scope -> prompt
         hookManager.onToolCall("ShellTool", "execute",
-                new Object[]{"make build"}, "s1", okCall());
+                new Object[]{"foobar build"}, "s1", okCall());
         assertEquals(1, testHandler.callCount);
     }
 

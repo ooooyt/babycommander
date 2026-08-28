@@ -128,7 +128,9 @@ The legacy token-based implementation is preserved in
 
 - **safe** — read-only commands (`ls`, `pwd`, `head`, `wc`, …) execute silently
 - **safe** — benign build/dev/read commands (`mvn test`, `npm run`, `git status`,
-  `cat`, `grep`, `cd`, …) are auto-allowed by SH-GUARD and run silently
+  `cat`, `grep`, `cd`, …) are auto-allowed by SH-GUARD and run silently; common
+  read-only pipeline filters (`tee`, `sed`, `awk`, `jq`, `less`, `cut`, `xargs`,
+  …) are safe too, so `mvn test | tee build.log` or `git log | less` never prompt
 - **ask_once** — unclassified or side-effecting commands require confirmation
 - **dangerous** — destructive operations (`rm -rf`, `sudo`, `dd`, `shutdown`,
   `DROP TABLE`, …) are gated

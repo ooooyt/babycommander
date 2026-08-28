@@ -542,6 +542,40 @@ public final class ShGuard {
                     }
                 }
             }
+            // sed in-place edits modify files.
+            if (command.equals("sed")) {
+                for (String t : deq) {
+                    if (t.equals("-i") || t.equals("--in-place")) {
+                        return true;
+                    }
+                }
+            }
+            // tee writing to a system path (e.g. tee /etc/passwd).
+            if (command.equals("tee")) {
+                for (String t : deq) {
+                    if (isSystemPath(t)) {
+                        return true;
+                    }
+                }
+            }
+            // xargs executing a dangerous command (e.g. xargs rm -rf, xargs sudo).
+            if (command.equals("xargs")) {
+                for (int i = 1; i < deq.size(); i++) {
+                    String t = deq.get(i);
+                    if (policy.dangerousCommands().contains(t) || t.equals("sudo")
+                            || policy.shellExecutorCommands().contains(t)) {
+                        return true;
+                    }
+                }
+            }
+            // awk/gawk/mawk with system() code execution.
+            if (command.equals("awk") || command.equals("gawk") || command.equals("mawk")) {
+                for (String t : deq) {
+                    if (t.contains("system(")) {
+                        return true;
+                    }
+                }
+            }
             return false;
         }
 
