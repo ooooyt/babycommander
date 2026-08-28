@@ -1,13 +1,11 @@
 # Hook configuration for tool call safety levels
 # This file is loaded separately from agents.yaml
-# Shell commands are additionally classified token-by-token by
-# ShellCommandAnalyzer: benign commands (e.g. 'mvn test', 'cat', 'git status')
-# run silently, while destructive ones are gated. 'dangerous'/'safe' patterns
-# below remain authoritative overrides; 'ask_once' patterns are superseded.
+# Shell commands are additionally classified by SH-GUARD
+# (com.ooooyt.babycommander.shguard), an ANTLR-based AST analyzer: benign
+# commands (e.g. 'mvn test', 'cat', 'git status') run silently, while
+# destructive ones are gated. 'dangerous'/'safe' patterns below remain
+# authoritative overrides; 'ask_once' patterns are superseded.
 enabled: true
-# In-scope auto-trust: operations confined to the current project folder
-# (auto) run without confirmation unless dangerous; 'strict' prompts always;
-# 'always' never prompts for in-scope ask_once operations.
 trustProject: ${BABY_COMMANDER_TRUST_PROJECT:auto}
 rules:
   - tool: "ShellTool"

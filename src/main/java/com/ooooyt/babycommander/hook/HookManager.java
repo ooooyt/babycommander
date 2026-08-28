@@ -467,7 +467,13 @@ public class HookManager {
             if (matched == DangerLevel.DANGEROUS || matched == DangerLevel.SAFE) {
                 return matched;
             }
-            return ShellCommandAnalyzer.analyze(command);
+            DangerLevel level = ShellCommandAnalyzer.analyze(command);
+            if (Log.isDebugEnabled()) {
+                var report = com.ooooyt.babycommander.shguard.ShGuard.analyzeDetailed(command);
+                Log.debugf("SH-GUARD: level=%s violations=%s parseError=%s",
+                        level, report.violations(), report.parseError());
+            }
+            return level;
         }
 
         // Non-shell tools: a matched content pattern is authoritative, else baseline.

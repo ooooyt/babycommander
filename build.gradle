@@ -119,6 +119,8 @@ sourceSets {
 // The built-in ANTLR worker does not infer a package from the grammar folder
 // (the Maven antlr4 plugin passes -package explicitly), so compute it from the
 // grammar's path relative to the antlr source dir and pass it to the tool.
+// All grammars live in the same package directory (com/ooooyt/babycommander/
+// util/antlr) so a single -package applies to every grammar file.
 generateGrammarSource {
     def grammarDir = file('src/main/antlr4')
     def grammarFile = fileTree(grammarDir) { include '**/*.g4' }.files.find { it.name.endsWith('.g4') }
@@ -128,6 +130,8 @@ generateGrammarSource {
             arguments += ['-package', pkg]
         }
     }
+    // Generate visitor classes (used by ShGuard's semantic analysis pass).
+    arguments += ['-visitor']
 }
 // -----------------------------------------------------------------------------
 // Application entry point (pom.xml quarkus-maven-plugin builds a Quarkus app;
