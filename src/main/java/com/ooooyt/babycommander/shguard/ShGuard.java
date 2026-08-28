@@ -639,6 +639,17 @@ public final class ShGuard {
                     current.append(tok.getText());
                     prevStop = tok.getStopIndex();
                     have = true;
+                } else if (child instanceof Command_wordContext cw) {
+                    // Command name (first word of a simple command).
+                    Token tok = cw.getStart();
+                    if (have && tok.getStartIndex() != prevStop + 1) {
+                        result.add(ShWord.parse(current.toString()));
+                        current.setLength(0);
+                        have = false;
+                    }
+                    current.append(tok.getText());
+                    prevStop = tok.getStopIndex();
+                    have = true;
                 } else {
                     // Non-word child (prefix / redirect) breaks adjacency.
                     if (have) {

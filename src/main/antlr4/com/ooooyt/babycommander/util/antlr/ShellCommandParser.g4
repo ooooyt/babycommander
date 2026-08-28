@@ -18,6 +18,15 @@ options { tokenVocab=ShellCommandLexer; }
 // fragments that belong to one logical shell word (e.g. r"m",
 // a"b"c, *.java) are merged by the semantic pass using source
 // positions (no whitespace gap => same logical word).
+//
+// Reserved words (if/then/fi/...) are lexed as dedicated tokens
+// but are ONLY meaningful in command position (compound-command
+// keywords). In argument position they are ordinary words, so the
+// `word` rule accepts them. The command NAME itself must be a
+// `command_word` (never a reserved word), which is what keeps
+// compound commands (if/while/for/case) unambiguous: a command can
+// never START with a reserved word, so the inner list of an
+// if_clause stops at `then`, a while_clause stops at `do`, etc.
 // ============================================================
 
 program
@@ -49,15 +58,21 @@ pipeline
     ;
 
 command
-    : simple_command
-    | compound_command redirect_list?
+    : compound_command redirect_list?
+    | simple_command
     | function_def
     ;
 
 // Assignments and redirects may only appear before the command name
 // (matching shell semantics); anything after is an argument word.
+// The command name must be a non-reserved word (command_word); reserved
+// words (if/then/fi/...) are only recognized in command position as
+// compound-command keywords, never as a command name. They ARE allowed
+// as arguments (e.g. `echo done`), which is why word includes them.
+// The command part is optional so that pure assignment/redirect
+// commands (e.g. "FOO=bar", "> file") still parse.
 simple_command
-    : prefix* word* ( redirect )*
+    : prefix* ( command_word word* )? ( redirect )*
     ;
 
 prefix
@@ -145,8 +160,34 @@ assignment
 // ------------------------------------------------------------------
 // Words: a single token that can form part of a command name or
 // argument. Adjacent fragments are merged by the semantic pass.
+//
+// `word` is any word-forming token, INCLUDING reserved words
+// (if/then/.../esac): in argument position (redirect target,
+// assignment value, echo argument, ...) they are ordinary words.
+//
+// `command_word` is a word that may START a simple command (i.e. be
+// a command name). Reserved words are excluded so that compound-
+// command keywords are only recognized in command position.
 // ------------------------------------------------------------------
 word
+    : WORD
+    | IO_NUMBER
+    | SQUOTE_STRING
+    | DQUOTE_STRING
+    | ANSI_C_STRING
+    | ARITH_EXPAND
+    | CMD_SUBST
+    | BACKTICK
+    | VAR_BRACED
+    | VAR_SIMPLE
+    | VAR_SPECIAL
+    | ESCAPED
+    | OTHER
+    | OP_ASSIGN
+    | IF | THEN | ELIF | ELSE | FI | WHILE | UNTIL | DO | DONE | FOR | IN | CASE | ESAC
+    ;
+
+command_word
     : WORD
     | IO_NUMBER
     | SQUOTE_STRING

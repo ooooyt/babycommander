@@ -76,10 +76,38 @@ class ShGuardTest {
         "time mvn test",
         "make -j4",
         "du -sh .",
-        "stat -f src"
+        "stat -f src",
+        // Reserved words as arguments (previously a parse error -> ASK_ONCE).
+        "echo done",
+        "ls; echo done",
+        "ls && echo done",
+        "echo if then else fi while until for in case esac do done",
+        "git status; echo done",
+        "mvn test | tee build.log; echo done",
+        "wc -l src/main/java/com/ooooyt/babycommander/tool/*.java; echo done",
+        "wc -l src/main/java/com/ooooyt/babycommander/tool/*.java src/main/java/com/ooooyt/babycommander/editloop/*.java src/main/java/com/ooooyt/babycommander/intent/*.java src/main/java/com/ooooyt/babycommander/orchestrator/*.java; echo done",
+        // Compound cd/git/echo/head chains with stderr redirects and '--' arg.
+        "cd /Users/yangtao/local-repo/babycommander && git log --oneline -5 2>/dev/null; echo \"---\"; git status --short 2>/dev/null | head -20; echo \"---\"; git log --oneline -3 -- docs/bug-scan-report.md 2>/dev/null",
+        "cd /proj && git log --oneline -5 2>/dev/null; echo ---; git status --short | head -20"
     })
     void testSafeCommands(String command) {
         assertEquals(DangerLevel.SAFE, ShGuard.analyze(command), command);
+    }
+
+    @Test
+    void testControlStructuresStillParse() {
+        // Compound commands must still parse as control structures (not as
+        // sequences of simple commands) now that reserved words are allowed
+        // as arguments.
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("if true; then echo hi; fi"));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("if true; then echo hi; elif false; then echo no; else echo bye; fi"));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("while true; do echo hi; done"));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("until false; do echo hi; done"));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("for i in a b c; do echo $i; done"));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("case x in a) echo hi;; b) echo bye;; esac"));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("foo() { echo hi; }"));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("(echo hi)"));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("{ echo hi; }"));
     }
 
     // ========== Dangerous commands ==========
