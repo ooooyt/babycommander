@@ -126,14 +126,26 @@ The legacy token-based implementation is preserved in
 `ShellCommandAnalyzerLegacy` and can be re-enabled for hot rollback with
 `BABY_COMMANDER_SHGUARD_DISABLED=true`.
 
-- **safe** — read-only commands (`ls`, `pwd`, `head`, `wc`, …) execute silently
-- **safe** — benign build/dev/read commands (`mvn test`, `npm run`, `git status`,
-  `cat`, `grep`, `cd`, …) are auto-allowed by SH-GUARD and run silently; common
-  read-only pipeline filters (`tee`, `sed`, `awk`, `jq`, `less`, `cut`, `xargs`,
-  …) are safe too, so `mvn test | tee build.log` or `git log | less` never prompt
+SH-GUARD classifies each simple command with project-root context (the current
+project folder), following three rules:
+
+- **Rule 1 — reading is safe** — read-only commands (`ls`, `pwd`, `head`, `wc`,
+  `cat`, `grep`, `git status`, `mvn test`, …) execute silently; common read-only
+  pipeline filters (`tee`, `sed`, `awk`, `jq`, `less`, `cut`, `xargs`, …) are
+  safe too, so `mvn test | tee build.log` or `git log | less` never prompt.
+- **Rule 2 — writes inside the project are safe** — write redirects (`>`,
+  `>>`, `2>`, …) and write-command arguments (`sed -i`, `tee`, `touch`, `mkdir`,
+  `cp`/`mv`/`ln` destinations, `git add`, …) are resolved against the project
+  folder: targets inside the project (or `/tmp`) run silently; targets outside
+  (e.g. `echo x > ~/.bashrc`) are gated as `WRITE_OUTSIDE_PROJECT`.
+- **Rule 3 — no data loss is safe** — non-destructive operations such as
+  `git revert` stay safe; destructive operations are always gated regardless of
+  scope.
+
 - **ask_once** — unclassified or side-effecting commands require confirmation
 - **dangerous** — destructive operations (`rm -rf`, `sudo`, `dd`, `shutdown`,
-  `DROP TABLE`, …) are gated
+  `DROP TABLE`, force-push, `git reset --hard HEAD~`, …) are gated and never
+  auto-trusted
 
 Custom rules and patterns can be added under `rules:` and `patterns:`. For shell
 commands, `dangerous` and `safe` patterns remain authoritative overrides; the
