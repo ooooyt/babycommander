@@ -8,6 +8,8 @@ import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -69,14 +71,27 @@ public class McpClientManager {
         try {
             tools.add(new McpToolAdapter(serverId, "mcp_call", "Call an MCP tool from server " + serverId, input -> {
                 try {
-                    java.io.OutputStream out = process.getOutputStream();
+                    OutputStream out = process.getOutputStream();
                     out.write((input + "\n").getBytes(StandardCharsets.UTF_8));
                     out.flush();
 
-                    java.io.InputStream in = process.getInputStream();
+                    // Read the full response instead of a single 4096-byte chunk:
+                    // poll until EOF or a bounded deadline so large replies are
+                    // not truncated and the call cannot block indefinitely.
+                    InputStream in = process.getInputStream();
+                    java.io.ByteArrayOutputStream response = new java.io.ByteArrayOutputStream();
                     byte[] buffer = new byte[4096];
-                    int len = in.readNBytes(buffer, 0, 4096);
-                    return new String(buffer, 0, len, StandardCharsets.UTF_8);
+                    long deadline = System.currentTimeMillis() + 5000;
+                    while (System.currentTimeMillis() < deadline) {
+                        if (in.available() > 0) {
+                            int len = in.read(buffer);
+                            if (len == -1) break;
+                            response.write(buffer, 0, len);
+                        } else {
+                            Thread.sleep(50);
+                        }
+                    }
+                    return response.toString(StandardCharsets.UTF_8);
                 } catch (Exception e) {
                     return "Error calling MCP tool: " + e.getMessage();
                 }

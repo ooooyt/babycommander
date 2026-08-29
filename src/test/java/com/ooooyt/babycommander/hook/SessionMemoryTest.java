@@ -95,6 +95,28 @@ class SessionMemoryTest {
         assertEquals("ShellTool::", sig);
     }
 
+    @Test
+    void testBuildSignatureWithArrayArgsIsDeterministic() {
+        // Object[].toString() returns the identity hashcode, which differs on
+        // every call. Array args must produce stable signatures so that
+        // trust/deny persistence actually matches on the next call.
+        String[] patches1 = {"@@ -1,3 +1,3 @@", "+line"};
+        String[] patches2 = {"@@ -1,3 +1,3 @@", "+line"};
+        String sig1 = SessionMemory.buildSignature("FileSystemTool", new Object[]{"src/Foo.java", patches1});
+        String sig2 = SessionMemory.buildSignature("FileSystemTool", new Object[]{"src/Foo.java", patches2});
+        assertEquals(sig1, sig2);
+        assertFalse(sig1.contains("[Ljava.lang.String;@"));
+    }
+
+    @Test
+    void testArrayArgsTrustRoundTrip() {
+        SessionMemory memory = new SessionMemory();
+        Object[] args = new Object[]{"src/Foo.java", new String[]{"@@ -1,3 +1,3 @@", "+line"}};
+        memory.markAllowedAlways("s1", "FileSystemTool", "applyFilePatch", args);
+        assertTrue(memory.isAllowedAlways("s1", "FileSystemTool", args));
+    }
+
+
     // ========== Method-Level Trust Tests ==========
 
     @Test

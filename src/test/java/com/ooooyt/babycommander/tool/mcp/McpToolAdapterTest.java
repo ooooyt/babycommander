@@ -1,7 +1,10 @@
 package com.ooooyt.babycommander.tool.mcp;
 
+import dev.langchain4j.agent.tool.ToolSpecification;
+import dev.langchain4j.agent.tool.ToolSpecifications;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -96,5 +99,20 @@ class McpToolAdapterTest {
 
         String result = adapter.callMcpTool("some input");
         assertSame("some input", result);
+    }
+
+    @Test
+    void testToolSpecificationDiscovered() {
+        // AgentFactory.buildToolExecutorMap() discovers tools via
+        // ToolSpecifications.toolSpecificationsFrom(), which only picks up
+        // @Tool-annotated methods. Without the annotation, MCP tools would be
+        // invisible to the LLM.
+        McpToolAdapter adapter = new McpToolAdapter("s1", "t1", "desc", input -> "ok");
+
+        List<ToolSpecification> specs = ToolSpecifications.toolSpecificationsFrom(adapter);
+
+        assertEquals(1, specs.size());
+        assertEquals("callMcpTool", specs.get(0).name());
+        assertEquals(1, specs.get(0).parameters().properties().size());
     }
 }

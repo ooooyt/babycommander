@@ -116,6 +116,31 @@ class ShGuardTest {
         assertEquals(DangerLevel.SAFE, ShGuard.analyze("{ echo hi; }"));
     }
 
+    @Test
+    void testHeredocBodiesAreDataNotCommands() {
+        // Heredoc bodies are stdin data: unknown/dangerous-looking lines inside
+        // them must NOT be treated as shell commands (false-positive fix).
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze(
+                "cat > /tmp/DumpHooks.java <<'EOF'\nimport io.objectbox.Box;\nimport io.objectbox.BoxStore;\nEOF"));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze(
+                "cat <<'EOF'\nrm -rf /\nEOF"));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze(
+                "cat <<EOF\nrm -rf /\nEOF"));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze(
+                "cat <<-EOF\n\trm -rf /\n\tEOF"));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze(
+                "tee /tmp/out.txt <<'EOF'\nsudo rm -rf /\nEOF"));
+    }
+
+    @Test
+    void testCommandsAfterHeredocTerminatorStillAnalyzed() {
+        // Real commands following the heredoc terminator must still be checked.
+        assertEquals(DangerLevel.DANGEROUS, ShGuard.analyze(
+                "cat <<'EOF'\nhello\nEOF\nrm -rf /"));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze(
+                "cat <<'EOF'\nhello\nEOF\nls -la"));
+    }
+
     // ========== Dangerous commands ==========
 
     @ParameterizedTest

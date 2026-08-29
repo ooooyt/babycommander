@@ -6,6 +6,7 @@ import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -30,10 +31,22 @@ public class SessionMemory {
         if (args != null) {
             for (int i = 0; i < args.length; i++) {
                 if (i > 0) sb.append("|");
-                sb.append(args[i] != null ? args[i].toString() : "null");
+                sb.append(formatArg(args[i]));
             }
         }
         return sb.toString();
+    }
+
+    private static String formatArg(Object arg) {
+        if (arg == null) {
+            return "null";
+        }
+        if (arg.getClass().isArray()) {
+            // Object.toString() on arrays returns the identity hashcode, which
+            // differs on every call and breaks exact-match trust/deny persistence.
+            return Arrays.deepToString(new Object[]{arg});
+        }
+        return arg.toString();
     }
 
     /**
@@ -125,7 +138,7 @@ public class SessionMemory {
 
     /**
      * Mark a tool call as denied (user answered 'n').
-     * Persists to database for ASK_ONCE operations.
+     * Persists to database.
      */
     public void markDenied(String sessionId, String toolName, Object[] args) {
         String signature = buildSignature(toolName, args);

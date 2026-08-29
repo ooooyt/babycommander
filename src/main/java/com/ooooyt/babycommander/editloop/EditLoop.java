@@ -88,7 +88,7 @@ public class EditLoop {
 
             if (isSuccessful(testOutput)) {
                 Log.infof("EditLoop: tests passed after %d attempt(s)", attempt);
-                return EditLoopResult.success(testOutput, attempt - 1);
+                return EditLoopResult.success(testOutput, attempt);
             }
 
             // Update failure context for next iteration

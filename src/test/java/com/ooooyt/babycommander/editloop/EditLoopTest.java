@@ -38,7 +38,7 @@ class EditLoopTest {
 
         assertAll("first attempt success",
             () -> assertTrue(result.success()),
-            () -> assertEquals(0, result.attempts()),
+            () -> assertEquals(1, result.attempts()),
             () -> assertEquals(SUCCESS_OUTPUT, result.testOutput())
         );
     }
@@ -65,7 +65,7 @@ class EditLoopTest {
 
         assertAll("retry until pass",
             () -> assertTrue(result.success()),
-            () -> assertEquals(2, result.attempts()),
+            () -> assertEquals(3, result.attempts()),
             () -> assertEquals(3, callCount[0])
         );
     }

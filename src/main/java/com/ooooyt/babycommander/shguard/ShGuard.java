@@ -148,10 +148,55 @@ public final class ShGuard {
         private final ShGuardPolicy policy;
         private final String command;
         private final Analysis analysis = new Analysis();
+        private final List<int[]> heredocBodyRanges;
 
         Analyzer(ShGuardPolicy policy, String command) {
             this.policy = policy;
             this.command = command;
+            this.heredocBodyRanges = findHeredocBodyRanges(command);
+        }
+
+        /** True when the source range [start, end) lies inside a heredoc body. */
+        private boolean isInHeredocBody(int start, int end) {
+            for (int[] r : heredocBodyRanges) {
+                if (start >= r[0] && end <= r[1]) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Locates heredoc bodies in the raw command text. Each returned range
+         * [start, end) covers the body lines (after the delimiter line) up to
+         * and including the terminator line. The body is stdin data, so the
+         * semantic pass must not treat it as shell commands.
+         */
+        private static List<int[]> findHeredocBodyRanges(String command) {
+            List<int[]> ranges = new ArrayList<>();
+            java.util.regex.Pattern heredocStart = java.util.regex.Pattern.compile(
+                    "<<-?\\s*(?:'([^']*)'|\"([^\"]*)\"|\\\\([A-Za-z_][A-Za-z0-9_]*)|([A-Za-z_][A-Za-z0-9_]*))");
+            java.util.regex.Matcher m = heredocStart.matcher(command);
+            while (m.find()) {
+                String delim = m.group(1) != null ? m.group(1)
+                        : m.group(2) != null ? m.group(2)
+                        : m.group(3) != null ? m.group(3) : m.group(4);
+                if (delim == null || delim.isEmpty()) {
+                    continue;
+                }
+                int bodyStart = command.indexOf('\n', m.end());
+                if (bodyStart < 0) {
+                    continue;
+                }
+                bodyStart++;
+                java.util.regex.Matcher term = java.util.regex.Pattern.compile(
+                                "(?m)^[ \\t]*" + java.util.regex.Pattern.quote(delim) + "[ \\t]*\\r?\\n?")
+                        .matcher(command);
+                term.region(bodyStart, command.length());
+                int bodyEnd = term.find() ? term.end() : command.length();
+                ranges.add(new int[]{bodyStart, bodyEnd});
+            }
+            return ranges;
         }
 
         // ---- Program / list structure ---------------------------------
@@ -190,6 +235,11 @@ public final class ShGuard {
 
         @Override
         public Void visitSimple_command(Simple_commandContext ctx) {
+            // Heredoc bodies are data, not commands: `cat > f <<'EOF' ... EOF`
+            // must not classify the body lines as shell commands.
+            if (isInHeredocBody(ctx.start.getStartIndex(), ctx.stop.getStopIndex() + 1)) {
+                return null;
+            }
             List<ShWord> words = collectWords(ctx);
             List<RedirectContext> redirects = new ArrayList<>(ctx.redirect());
             // Redirects consumed as prefixes (e.g. "> /etc/crontab" with no
