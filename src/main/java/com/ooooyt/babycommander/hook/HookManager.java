@@ -467,9 +467,9 @@ public class HookManager {
             if (matched == DangerLevel.DANGEROUS || matched == DangerLevel.SAFE) {
                 return matched;
             }
-            DangerLevel level = ShellCommandAnalyzer.analyze(command);
+            DangerLevel level = ShellCommandAnalyzer.analyze(command, currentProjectRoot);
             if (Log.isDebugEnabled()) {
-                var report = com.ooooyt.babycommander.shguard.ShGuard.analyzeDetailed(command);
+                var report = com.ooooyt.babycommander.shguard.ShGuard.analyzeDetailed(command, currentProjectRoot);
                 Log.debugf("SH-GUARD: level=%s violations=%s parseError=%s",
                         level, report.violations(), report.parseError());
             }

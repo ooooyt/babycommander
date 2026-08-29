@@ -768,10 +768,12 @@ class HookManagerTest {
                 new Object[]{"/proj/src/Foo.java", "content"}, "s1", okCall());
         assertEquals(1, testHandler.callCount);
 
-        // ShellTool touching the same path — tool name is part of the key
+        // ShellTool referencing the same path — tool name is part of the key.
+        // (An unknown command is used: `touch /proj/src/Foo.java` is now auto-
+        // safe under rule 2 as an in-project write, so it would not prompt.)
         testHandler.callCount = 0;
         hookManager.onToolCall("ShellTool", "execute",
-                new Object[]{"touch /proj/src/Foo.java"}, "s1", okCall());
+                new Object[]{"some-custom-tool /proj/src/Foo.java"}, "s1", okCall());
         assertEquals(1, testHandler.callCount, "Other tool still prompts for same path");
     }
 
@@ -950,5 +952,61 @@ class HookManagerTest {
         } finally {
             hookManager.exitSession();
         }
+    }
+
+    // ========== Project-root-aware ShellTool classification (3 rules) ==========
+
+    @Test
+    void testShellToolInProjectWriteIsSafeNoPrompt() throws Exception {
+        hookManager.setProjectRoot("/proj");
+        String result = hookManager.onToolCall("ShellTool", "execute",
+                new Object[]{"echo hello > notes.txt"}, "s1", okCall());
+        assertEquals("ok", result);
+        assertEquals(0, testHandler.callCount, "in-project write must not prompt");
+    }
+
+    @Test
+    void testShellToolHomeWritePromptsDangerous() throws Exception {
+        hookManager.setProjectRoot("/proj");
+        hookManager.onToolCall("ShellTool", "execute",
+                new Object[]{"echo x > ~/.bashrc"}, "s1", okCall());
+        assertEquals(1, testHandler.callCount, "~/.bashrc write must prompt");
+        assertEquals(DangerLevel.DANGEROUS, testHandler.lastInfo.level());
+    }
+
+    @Test
+    void testShellToolGitRevertIsSafeNoPrompt() throws Exception {
+        hookManager.setProjectRoot("/proj");
+        String result = hookManager.onToolCall("ShellTool", "execute",
+                new Object[]{"git revert HEAD"}, "s1", okCall());
+        assertEquals("ok", result);
+        assertEquals(0, testHandler.callCount, "git revert (no data loss) must not prompt");
+    }
+
+    @Test
+    void testShellToolRmStillPromptsDangerous() throws Exception {
+        hookManager.setProjectRoot("/proj");
+        hookManager.onToolCall("ShellTool", "execute",
+                new Object[]{"rm file.txt"}, "s1", okCall());
+        assertEquals(1, testHandler.callCount, "rm must prompt");
+        assertEquals(DangerLevel.DANGEROUS, testHandler.lastInfo.level());
+    }
+
+    @Test
+    void testShellToolSedInProjectIsSafeNoPrompt() throws Exception {
+        hookManager.setProjectRoot("/proj");
+        String result = hookManager.onToolCall("ShellTool", "execute",
+                new Object[]{"sed -i 's/x/y/' src/Foo.java"}, "s1", okCall());
+        assertEquals("ok", result);
+        assertEquals(0, testHandler.callCount, "sed -i on a project file must not prompt");
+    }
+
+    @Test
+    void testShellToolSedOnHomePromptsDangerous() throws Exception {
+        hookManager.setProjectRoot("/proj");
+        hookManager.onToolCall("ShellTool", "execute",
+                new Object[]{"sed -i 's/x/y/' ~/.bashrc"}, "s1", okCall());
+        assertEquals(1, testHandler.callCount, "sed -i on ~/.bashrc must prompt");
+        assertEquals(DangerLevel.DANGEROUS, testHandler.lastInfo.level());
     }
 }

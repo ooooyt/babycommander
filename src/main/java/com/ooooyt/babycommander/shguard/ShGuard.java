@@ -58,13 +58,34 @@ public final class ShGuard {
         return withPolicy(ShGuardPolicy.defaults()).classify(command).level();
     }
 
+    /**
+     * Classify a command with project-root context. Write targets (redirects
+     * and write-command arguments) are resolved against the project folder:
+     * writes confined to the project are safe (rule 2), writes outside are
+     * gated. A {@code null}/{@code blank} root falls back to the legacy
+     * conservative classification.
+     */
+    public static DangerLevel analyze(String command, String projectRoot) {
+        return withPolicy(ShGuardPolicy.defaults()).classify(command, projectRoot).level();
+    }
+
     /** Classify a command and return the enriched report. */
     public static ShGuardReport analyzeDetailed(String command) {
         return withPolicy(ShGuardPolicy.defaults()).classify(command);
     }
 
+    /** Classify a command with project-root context and return the enriched report. */
+    public static ShGuardReport analyzeDetailed(String command, String projectRoot) {
+        return withPolicy(ShGuardPolicy.defaults()).classify(command, projectRoot);
+    }
+
     /** Classify a command with this guard's policy. */
     public ShGuardReport classify(String command) {
+        return classify(command, null);
+    }
+
+    /** Classify a command with this guard's policy and an optional project root. */
+    public ShGuardReport classify(String command, String projectRoot) {
         if (command == null || command.isBlank()) {
             return ShGuardReport.of(DangerLevel.ASK_ONCE, List.of());
         }
@@ -94,7 +115,7 @@ public final class ShGuard {
             return ShGuardReport.parseError("parse exception: " + e.getMessage());
         }
 
-        Analyzer analyzer = new Analyzer(policy, command);
+        Analyzer analyzer = new Analyzer(policy, command, projectRoot);
         analyzer.visit(tree);
 
         if (!errors.isEmpty()) {
@@ -147,13 +168,17 @@ public final class ShGuard {
     private static final class Analyzer extends ShellCommandParserBaseVisitor<Void> {
         private final ShGuardPolicy policy;
         private final String command;
+        private final String projectRoot;
         private final Analysis analysis = new Analysis();
         private final List<int[]> heredocBodyRanges;
+        private final List<int[]> unquotedHeredocBodies;
 
-        Analyzer(ShGuardPolicy policy, String command) {
+        Analyzer(ShGuardPolicy policy, String command, String projectRoot) {
             this.policy = policy;
+            this.projectRoot = projectRoot;
             this.command = command;
             this.heredocBodyRanges = findHeredocBodyRanges(command);
+            this.unquotedHeredocBodies = findUnquotedHeredocBodies(command);
         }
 
         /** True when the source range [start, end) lies inside a heredoc body. */
@@ -199,13 +224,110 @@ public final class ShGuard {
             return ranges;
         }
 
+        /**
+         * Locates heredoc bodies whose delimiter is <em>unquoted</em>
+         * ({@code <<EOF}). Unlike quoted heredocs, these bodies undergo shell
+         * expansion, so command substitutions inside them would execute and
+         * must be analyzed (see {@link #checkHeredocCommandSubstitutions()}).
+         */
+        private static List<int[]> findUnquotedHeredocBodies(String command) {
+            List<int[]> ranges = new ArrayList<>();
+            java.util.regex.Pattern heredocStart = java.util.regex.Pattern.compile(
+                    "<<-?\\s*(?:'([^']*)'|\"([^\"]*)\"|\\\\([A-Za-z_][A-Za-z0-9_]*)|([A-Za-z_][A-Za-z0-9_]*))");
+            java.util.regex.Matcher m = heredocStart.matcher(command);
+            while (m.find()) {
+                if (m.group(1) != null || m.group(2) != null || m.group(3) != null) {
+                    continue; // quoted/escaped delimiter: body is literal data
+                }
+                String delim = m.group(4);
+                if (delim == null || delim.isEmpty()) {
+                    continue;
+                }
+                int bodyStart = command.indexOf('\n', m.end());
+                if (bodyStart < 0) {
+                    continue;
+                }
+                bodyStart++;
+                java.util.regex.Matcher term = java.util.regex.Pattern.compile(
+                                "(?m)^[ \t]*" + java.util.regex.Pattern.quote(delim) + "[ \t]*\r?\n?")
+                        .matcher(command);
+                term.region(bodyStart, command.length());
+                int bodyEnd = term.find() ? term.end() : command.length();
+                ranges.add(new int[]{bodyStart, bodyEnd});
+            }
+            return ranges;
+        }
+
+        /**
+         * Scans unquoted heredoc bodies for command substitutions
+         * ({@code $(...)} / backticks) and classifies each recursively.
+         * Quoted heredoc bodies are literal data and are never scanned.
+         */
+        private void checkHeredocCommandSubstitutions() {
+            for (int[] r : unquotedHeredocBodies) {
+                String body = command.substring(r[0], r[1]);
+                for (String sub : extractCommandSubstitutions(body)) {
+                    ShGuardReport subReport = new ShGuard(policy).classify(sub);
+                    if (subReport.level() == DangerLevel.DANGEROUS) {
+                        analysis.dangerous(ShReason.REMOTE_CODE_EXECUTION,
+                                "heredoc command substitution: " + sub,
+                                body, r[0], r[1]);
+                    } else if (subReport.level() == DangerLevel.ASK_ONCE) {
+                        analysis.unknown(ShReason.VARIABLE_COMMAND_NAME,
+                                "heredoc command substitution: " + sub,
+                                body, r[0], r[1]);
+                    }
+                }
+            }
+        }
+
+        /** Extracts {@code $(...)} and backtick command substitutions from text. */
+        private static List<String> extractCommandSubstitutions(String text) {
+            List<String> out = new ArrayList<>();
+            int i = 0;
+            int n = text.length();
+            while (i < n) {
+                char c = text.charAt(i);
+                if (c == '$' && i + 1 < n && text.charAt(i + 1) == '(') {
+                    int depth = 1;
+                    int j = i + 2;
+                    while (j < n && depth > 0) {
+                        if (text.charAt(j) == '(') {
+                            depth++;
+                        } else if (text.charAt(j) == ')') {
+                            depth--;
+                        }
+                        j++;
+                    }
+                    if (depth == 0) {
+                        out.add(text.substring(i + 2, j - 1));
+                        i = j;
+                        continue;
+                    }
+                } else if (c == '`') {
+                    int end = text.indexOf('`', i + 1);
+                    if (end >= 0) {
+                        out.add(text.substring(i + 1, end));
+                        i = end + 1;
+                        continue;
+                    }
+                }
+                i++;
+            }
+            return out;
+        }
+
         // ---- Program / list structure ---------------------------------
 
         @Override
         public Void visitProgram(ProgramContext ctx) {
             // Pre-pass: collect constant assignments for folding.
             collectAssignments(ctx);
-            return visitChildren(ctx);
+            visitChildren(ctx);
+            // Unquoted heredoc bodies undergo expansion: command substitutions
+            // inside them would execute, so analyze them after the main pass.
+            checkHeredocCommandSubstitutions();
+            return null;
         }
 
         @Override
@@ -324,6 +446,40 @@ public final class ShGuard {
                 analysis.dangerous(ShReason.DB_DESTRUCTION, "database destruction",
                         subCommandText(ctx), ctx.start.getStartIndex(), ctx.stop.getStopIndex() + 1);
                 return null;
+            }
+
+            // Rule 2 (path-aware writes): commands whose arguments are write
+            // targets (sed -i, tee, touch, mkdir, cp/mv/ln dest, git add, ...)
+            // are safe when every target resolves inside the project folder
+            // (or /tmp); any target outside the project is gated. Without a
+            // project root, sed -i and tee keep their legacy conservative
+            // classification (any in-place edit / system-path tee is dangerous).
+            if (isWriteArgCommand(cmdName)) {
+                List<String> targets = writeTargets(cmdName, dequotedWords(words));
+                if (projectRoot == null || projectRoot.isBlank()) {
+                    if (cmdName.equals("sed") && hasInPlaceFlag(dequotedWords(words))) {
+                        analysis.dangerous(ShReason.DANGEROUS_FLAG, "sed in-place edit",
+                                subCommandText(ctx), ctx.start.getStartIndex(), ctx.stop.getStopIndex() + 1);
+                        return null;
+                    }
+                    if (cmdName.equals("tee") && hasSystemPathArg(dequotedWords(words))) {
+                        analysis.dangerous(ShReason.DANGEROUS_FLAG, "tee to system path",
+                                subCommandText(ctx), ctx.start.getStartIndex(), ctx.stop.getStopIndex() + 1);
+                        return null;
+                    }
+                } else if (!targets.isEmpty()) {
+                    for (String t : targets) {
+                        if (!isWriteTargetInScope(expandHome(t))) {
+                            analysis.dangerous(ShReason.WRITE_OUTSIDE_PROJECT,
+                                    "write target outside project: " + t,
+                                    subCommandText(ctx),
+                                    ctx.start.getStartIndex(), ctx.stop.getStopIndex() + 1);
+                            return null;
+                        }
+                    }
+                    // All write targets are inside the project folder: safe.
+                    return null;
+                }
             }
 
             if (policy.safeCommands().contains(cmdName)) {
@@ -483,10 +639,27 @@ public final class ShGuard {
                 String op = r.redirect_op().getText();
                 if (isWriteOp(op)) {
                     String target = r.word() == null ? "" : dequoteFirstWord(r.word());
-                    if (target != null && !target.isEmpty() && !target.startsWith("$")
-                            && isSystemPathWriteTarget(target)) {
+                    if (target == null || target.isEmpty() || target.startsWith("$")) {
+                        continue;
+                    }
+                    String expanded = expandHome(target);
+                    // Rule 2: writes confined to the project folder (or /tmp,
+                    // or the allowlist) are safe — checked before system paths
+                    // so in-project writes under $HOME are not mis-flagged.
+                    if (projectRoot != null && !projectRoot.isBlank()
+                            && isWriteTargetInScope(expanded)) {
+                        continue;
+                    }
+                    if (isSystemPathWriteTarget(expanded)) {
                         analysis.dangerous(ShReason.WRITE_REDIRECT_SYSTEM_PATH,
                                 "write redirect to system path: " + op + " " + target,
+                                subCommandText(ctx),
+                                ctx.start.getStartIndex(), ctx.stop.getStopIndex() + 1);
+                        return true;
+                    }
+                    if (projectRoot != null && !projectRoot.isBlank()) {
+                        analysis.dangerous(ShReason.WRITE_OUTSIDE_PROJECT,
+                                "write redirect outside project: " + op + " " + target,
                                 subCommandText(ctx),
                                 ctx.start.getStartIndex(), ctx.stop.getStopIndex() + 1);
                         return true;
@@ -510,6 +683,152 @@ public final class ShGuard {
             }
             for (String prefix : policy.systemPathPrefixes()) {
                 if (target.equals(prefix) || target.startsWith(prefix + "/")) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Rule 2 scope check: a write target is in scope when it resolves
+         * inside the project folder, is under {@code /tmp} (temp data, no data
+         * loss), or is on the write-redirect allowlist. Relative targets are
+         * resolved against the project root (the shell working directory).
+         */
+        private boolean isWriteTargetInScope(String target) {
+            if (target == null || target.isEmpty()) {
+                return false;
+            }
+            if (policy.writeRedirectAllowlist().contains(target)) {
+                return true;
+            }
+            if (isTempPath(target)) {
+                return true;
+            }
+            if (projectRoot == null || projectRoot.isBlank()) {
+                // No project context: only relative paths are unverifiable
+                // (treated as in-scope by the caller's legacy path).
+                return !java.nio.file.Path.of(target).isAbsolute();
+            }
+            try {
+                java.nio.file.Path root = java.nio.file.Path.of(projectRoot).normalize();
+                java.nio.file.Path t = java.nio.file.Path.of(target);
+                if (!t.isAbsolute()) {
+                    t = root.resolve(t);
+                }
+                return t.normalize().startsWith(root);
+            } catch (Exception e) {
+                return false; // unresolvable target: gate conservatively
+            }
+        }
+
+        /** {@code /tmp} writes are temp data: no data loss, so in scope. */
+        private static boolean isTempPath(String target) {
+            return target.equals("/tmp") || target.startsWith("/tmp/");
+        }
+
+        /** Expand a leading {@code ~} to the user home directory. */
+        private static String expandHome(String target) {
+            if (target == null) {
+                return null;
+            }
+            String home = System.getProperty("user.home");
+            if (home == null) {
+                return target;
+            }
+            if (target.equals("~")) {
+                return home;
+            }
+            if (target.startsWith("~/")) {
+                return home + target.substring(1);
+            }
+            return target;
+        }
+
+        /** Commands whose non-flag arguments are (or include) write targets. */
+        private static boolean isWriteArgCommand(String cmdName) {
+            return switch (cmdName) {
+                case "sed", "tee", "touch", "mkdir", "cp", "mv", "ln", "install", "git" -> true;
+                default -> false;
+            };
+        }
+
+        /**
+         * Extract the write-target arguments of a write command. Flags and
+         * option values are skipped; for {@code cp}/{@code mv}/{@code ln}/
+         * {@code install} only the destination (last non-flag arg) is checked.
+         */
+        private List<String> writeTargets(String cmdName, List<String> deq) {
+            List<String> targets = new ArrayList<>();
+            switch (cmdName) {
+                case "sed" -> {
+                    for (int i = 1; i < deq.size(); i++) {
+                        String t = deq.get(i);
+                        if (t.startsWith("-i") || t.equals("--in-place")
+                                || t.startsWith("--in-place=")) {
+                            if ((t.equals("-i") || t.equals("--in-place")) && i + 1 < deq.size()) {
+                                i++; // skip the sed script argument
+                            }
+                            continue;
+                        }
+                        if (t.startsWith("-")) {
+                            continue;
+                        }
+                        targets.add(t);
+                    }
+                }
+                case "tee", "touch", "mkdir" -> {
+                    for (int i = 1; i < deq.size(); i++) {
+                        String t = deq.get(i);
+                        if (t.startsWith("-")) {
+                            continue;
+                        }
+                        targets.add(t);
+                    }
+                }
+                case "cp", "mv", "ln", "install" -> {
+                    String last = null;
+                    for (int i = 1; i < deq.size(); i++) {
+                        String t = deq.get(i);
+                        if (t.startsWith("-")) {
+                            continue;
+                        }
+                        last = t;
+                    }
+                    if (last != null) {
+                        targets.add(last);
+                    }
+                }
+                case "git" -> {
+                    if (deq.size() > 1 && deq.get(1).equals("add")) {
+                        for (int i = 2; i < deq.size(); i++) {
+                            String t = deq.get(i);
+                            if (t.startsWith("-")) {
+                                continue;
+                            }
+                            targets.add(t);
+                        }
+                    }
+                }
+                default -> { }
+            }
+            return targets;
+        }
+
+        /** True when the dequoted tokens contain a {@code sed -i} in-place flag. */
+        private static boolean hasInPlaceFlag(List<String> deq) {
+            for (String t : deq) {
+                if (t.startsWith("-i") || t.equals("--in-place") || t.startsWith("--in-place=")) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /** True when any dequoted token (with {@code ~} expanded) is a system path. */
+        private boolean hasSystemPathArg(List<String> deq) {
+            for (String t : deq) {
+                if (isSystemPath(expandHome(t))) {
                     return true;
                 }
             }
@@ -634,22 +953,10 @@ public final class ShGuard {
                     }
                 }
             }
-            // sed in-place edits modify files.
-            if (command.equals("sed")) {
-                for (String t : deq) {
-                    if (t.equals("-i") || t.equals("--in-place")) {
-                        return true;
-                    }
-                }
-            }
-            // tee writing to a system path (e.g. tee /etc/passwd).
-            if (command.equals("tee")) {
-                for (String t : deq) {
-                    if (isSystemPath(t)) {
-                        return true;
-                    }
-                }
-            }
+            // NOTE: sed -i and tee are handled by the path-aware write-target
+            // check in visitSimple_command (rule 2): in-project edits are safe,
+            // edits outside the project folder are gated. Without a project
+            // root they keep their legacy conservative classification there.
             // xargs executing a dangerous command (e.g. xargs rm -rf, xargs sudo).
             if (command.equals("xargs")) {
                 for (int i = 1; i < deq.size(); i++) {

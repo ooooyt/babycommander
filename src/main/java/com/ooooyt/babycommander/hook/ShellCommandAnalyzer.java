@@ -42,10 +42,20 @@ public final class ShellCommandAnalyzer {
      * @return the computed danger level
      */
     public static DangerLevel analyze(String command) {
+        return analyze(command, null);
+    }
+
+    /**
+     * Analyze a shell command with project-root context. The project folder is
+     * used for path-scoped write classification (rule 2): writes confined to
+     * the project are safe, writes outside are gated. A {@code null} root
+     * falls back to the legacy conservative classification.
+     */
+    public static DangerLevel analyze(String command, String projectRoot) {
         if (isDisabled()) {
             return ShellCommandAnalyzerLegacy.analyze(command);
         }
-        return ShGuard.analyze(command);
+        return ShGuard.analyze(command, projectRoot);
     }
 
     private static boolean isDisabled() {

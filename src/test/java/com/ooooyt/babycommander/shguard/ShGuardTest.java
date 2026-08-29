@@ -316,4 +316,97 @@ class ShGuardTest {
         ShGuardReport report = ShGuard.analyzeDetailed(null);
         assertEquals(DangerLevel.ASK_ONCE, report.level());
     }
+
+    // ========== Project-root-aware classification (3 rules) ==========
+    //
+    // Rule 1: reading is safe. Rule 2: writes confined to the project
+    // folder (or /tmp) are safe; writes outside are gated. Rule 3:
+    // operations that lose data (rm, destructive git, ...) are gated.
+    //
+    // The legacy no-root analyze() stays conservative (sed -i / tee to
+    // system paths remain DANGEROUS without project context).
+    private static final String PROJ = "/proj";
+
+    @Test
+    void testRule1ReadingIsSafeWithProjectRoot() {
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("cat src/Foo.java", PROJ));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("git status", PROJ));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("grep -r TODO src", PROJ));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("mvn test", PROJ));
+    }
+
+    @Test
+    void testRule2InProjectWritesAreSafe() {
+        // Redirects into the project folder.
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("echo hello > notes.txt", PROJ));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("cat > src/Foo.java", PROJ));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("mvn test | tee build.log", PROJ));
+        // Write-command arguments inside the project.
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("sed -i 's/x/y/' src/Foo.java", PROJ));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("touch src/Foo.java", PROJ));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("mkdir -p src/gen", PROJ));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("cp src/a.java src/b.java", PROJ));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("mv src/a.java src/b.java", PROJ));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("git add src/Foo.java", PROJ));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("git add -A", PROJ));
+        // /tmp is temp data: no data loss, so in scope.
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("cat > /tmp/DumpHooks.java", PROJ));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("mkdir -p /tmp/bc-test", PROJ));
+    }
+
+    @Test
+    void testRule3NoDataLossIsSafe() {
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("git revert HEAD", PROJ));
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("git revert --no-commit HEAD~1", PROJ));
+    }
+
+    @Test
+    void testRule2WritesOutsideProjectAreGated() {
+        // $HOME dotfiles (e.g. ~/.bashrc) are gated even with a project root.
+        assertEquals(DangerLevel.DANGEROUS, ShGuard.analyze("echo x > ~/.bashrc", PROJ));
+        assertEquals(DangerLevel.DANGEROUS, ShGuard.analyze("sed -i 's/x/y/' ~/.bashrc", PROJ));
+        assertEquals(DangerLevel.DANGEROUS, ShGuard.analyze("tee ~/.bashrc", PROJ));
+        assertEquals(DangerLevel.DANGEROUS, ShGuard.analyze("touch ~/.bashrc", PROJ));
+        assertEquals(DangerLevel.DANGEROUS, ShGuard.analyze("mkdir -p ~/foo", PROJ));
+        assertEquals(DangerLevel.DANGEROUS, ShGuard.analyze("cp src/Foo.java ~/backup/", PROJ));
+        assertEquals(DangerLevel.DANGEROUS, ShGuard.analyze("mv src/Foo.java ~/backup/", PROJ));
+        // Absolute paths outside the project folder.
+        assertEquals(DangerLevel.DANGEROUS, ShGuard.analyze("echo x > /other/place/file", PROJ));
+        assertEquals(DangerLevel.DANGEROUS, ShGuard.analyze("touch /other/place/file", PROJ));
+        assertEquals(DangerLevel.DANGEROUS, ShGuard.analyze("git add /etc/passwd", PROJ));
+        // System paths remain gated (existing behavior).
+        assertEquals(DangerLevel.DANGEROUS, ShGuard.analyze("echo x > /etc/crontab", PROJ));
+        assertEquals(DangerLevel.DANGEROUS, ShGuard.analyze("tee /etc/passwd", PROJ));
+    }
+
+    @Test
+    void testRule3DataLossIsGated() {
+        assertEquals(DangerLevel.DANGEROUS, ShGuard.analyze("rm file.txt", PROJ));
+        assertEquals(DangerLevel.DANGEROUS, ShGuard.analyze("git checkout -- src/Foo.java", PROJ));
+        assertEquals(DangerLevel.DANGEROUS, ShGuard.analyze("git reset --hard HEAD~1", PROJ));
+    }
+
+    @Test
+    void testLegacyNoRootStaysConservative() {
+        // Without a project root, sed -i and tee-to-system-path stay DANGEROUS.
+        assertEquals(DangerLevel.DANGEROUS, ShGuard.analyze("sed -i 's/x/y/' file"));
+        assertEquals(DangerLevel.DANGEROUS, ShGuard.analyze("tee /etc/passwd"));
+        // ~ expansion is now resolved against $HOME (system path) even without a root.
+        assertEquals(DangerLevel.DANGEROUS, ShGuard.analyze("echo x > ~/.bashrc"));
+        // /tmp writes remain safe without a root.
+        assertEquals(DangerLevel.SAFE, ShGuard.analyze("cat > /tmp/DumpHooks.java"));
+    }
+
+    @Test
+    void testDetailedReportOutsideProjectReason() {
+        ShGuardReport report = ShGuard.analyzeDetailed("echo x > ~/.bashrc", PROJ);
+        assertEquals(DangerLevel.DANGEROUS, report.level());
+        assertFalse(report.violations().isEmpty());
+        assertEquals(ShReason.WRITE_REDIRECT_SYSTEM_PATH, report.violations().get(0).reason());
+
+        ShGuardReport report2 = ShGuard.analyzeDetailed("echo x > /other/place/file", PROJ);
+        assertEquals(DangerLevel.DANGEROUS, report2.level());
+        assertFalse(report2.violations().isEmpty());
+        assertEquals(ShReason.WRITE_OUTSIDE_PROJECT, report2.violations().get(0).reason());
+    }
 }

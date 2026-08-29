@@ -20,6 +20,8 @@ public enum ShReason {
     DANGEROUS_FLAG,
     /** Write redirection targeting a system path (e.g. {@code > /etc/passwd}). */
     WRITE_REDIRECT_SYSTEM_PATH,
+    /** Write target (redirect or command argument) resolving outside the project folder. */
+    WRITE_OUTSIDE_PROJECT,
     /** Database destruction (drop table, truncate, DELETE FROM, ...). */
     DB_DESTRUCTION,
     /** Remote code execution: a fetch command piped into a shell (curl | bash). */

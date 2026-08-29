@@ -5,7 +5,7 @@
 # commands (e.g. 'mvn test', 'cat', 'git status') run silently, while
 # destructive ones are gated. 'dangerous'/'safe' patterns below remain
 # authoritative overrides; 'ask_once' patterns are superseded.
-enabled: false
+enabled: true
 trustProject: ${BABY_COMMANDER_TRUST_PROJECT:auto}
 rules:
   - tool: "ShellTool"

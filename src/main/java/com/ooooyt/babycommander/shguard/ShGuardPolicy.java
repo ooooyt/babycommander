@@ -175,7 +175,9 @@ public final class ShGuardPolicy {
 
         private Set<String> systemPathPrefixes = Set.of(
                 "/", "/etc", "/boot", "/dev", "/proc", "/sys", "/usr", "/bin",
-                "/sbin", "/var", "/lib", "/opt", "/root"
+                "/sbin", "/var", "/lib", "/opt", "/root",
+                // $HOME: dotfiles and user config (e.g. ~/.bashrc) are gated.
+                System.getProperty("user.home", "/root")
         );
 
         private Set<String> writeRedirectAllowlist = Set.of(
