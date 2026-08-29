@@ -10,6 +10,7 @@ import com.ooooyt.babycommander.util.I18n;
 import com.ooooyt.babycommander.util.MessageKey;
 import java.io.File;
 import java.io.InputStream;
+import java.util.Map;
 import io.quarkus.logging.Log;
 
 /**
@@ -17,6 +18,11 @@ import io.quarkus.logging.Log;
  *
  * <p>The hooks configuration has been extracted into a separate YAML file (hooks.yaml)
  * to keep agents.yaml focused on agent/provider configuration.</p>
+ *
+ * <p>Environment overrides are applied <em>after</em> parsing plain YAML defaults,
+ * through {@link Env}/{@link EnvKeys} (typed, empty→default semantics, deprecated
+ * aliases with warnings, {@code ~/.babycommander/.env} support). See
+ * {@code docs/env-vars-improvement.md}.</p>
  */
 @ApplicationScoped
 public class YamlConfigLoader {
@@ -42,15 +48,14 @@ public class YamlConfigLoader {
 
     public synchronized AgentConfig getConfig() {
         if (config == null) {
+            Env.loadDotEnv();
+            Env.warnIfDotEnvInProject();
             Log.infof("Loading config from: %s (classloader: %s)", configPath, getClass().getClassLoader().getClass().getName());
             config = loadConfig();
             loadHooksConfig(config);
             compilePatterns(config);
-            Log.infof("Config loaded: defaultModel=%s, providers=%d, agentRoles=%d, hooks=%s",
-                config.defaultModel,
-                config.providers != null ? config.providers.size() : -1,
-                config.agentRoles != null ? config.agentRoles.size() : -1,
-                config.hooks != null ? "enabled" : "not-loaded");
+            validate(config);
+            logEffectiveConfig(config);
         }
         return config;
     }
@@ -67,17 +72,14 @@ public class YamlConfigLoader {
             if (input == null) {
                 File file = new File(configPath);
                 if (file.exists()) {
-                    String raw = new String(java.nio.file.Files.readAllBytes(file.toPath()),
-                            java.nio.charset.StandardCharsets.UTF_8);
-                    AgentConfig cfg = mapper.readValue(resolveString(raw), AgentConfig.class);
-                    resolveEnvVars(cfg);
+                    AgentConfig cfg = mapper.readValue(file, AgentConfig.class);
+                    applyEnvOverrides(cfg);
                     return cfg;
                 }
                 throw new RuntimeException(I18n.tr(MessageKey.CONFIG_FILE_NOT_FOUND, configPath));
             }
-            String raw = new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-            AgentConfig cfg = mapper.readValue(resolveString(raw), AgentConfig.class);
-            resolveEnvVars(cfg);
+            AgentConfig cfg = mapper.readValue(input, AgentConfig.class);
+            applyEnvOverrides(cfg);
             return cfg;
         } catch (Exception e) {
             throw new RuntimeException(I18n.tr(MessageKey.CONFIG_LOAD_FAILED), e);
@@ -123,22 +125,139 @@ public class YamlConfigLoader {
         }
     }
 
-    private void resolveEnvVars(AgentConfig cfg) {
-        if (cfg.providers != null) {
-            cfg.providers.values().forEach(p -> resolveEnvVars(p));
+    // ------------------------------------------------------------------
+    // Environment overrides (typed, empty→default, deprecated aliases)
+    // ------------------------------------------------------------------
+
+    private void applyEnvOverrides(AgentConfig cfg) {
+        cfg.defaultModel = Env.getWithAliases(EnvKeys.DEFAULT_MODEL,
+                EnvKeys.DEPRECATED_ALIASES.get(EnvKeys.DEFAULT_MODEL), cfg.defaultModel);
+        cfg.workspaceRoot = Env.getWithAliases(EnvKeys.WORKSPACE_ROOT,
+                EnvKeys.DEPRECATED_ALIASES.get(EnvKeys.WORKSPACE_ROOT), cfg.workspaceRoot);
+        cfg.skipConfirmWorkspace = Env.getBooleanWithAliases(EnvKeys.SKIP_CONFIRM_WORKSPACE,
+                EnvKeys.DEPRECATED_ALIASES.get(EnvKeys.SKIP_CONFIRM_WORKSPACE), cfg.skipConfirmWorkspace);
+
+        if (cfg.agentDefaults != null) {
+            AgentConfig.AgentDefaults d = cfg.agentDefaults;
+            d.maxMessagesInMemory = Env.getIntWithAliases(EnvKeys.MAX_MESSAGES_IN_MEMORY,
+                    EnvKeys.DEPRECATED_ALIASES.get(EnvKeys.MAX_MESSAGES_IN_MEMORY), d.maxMessagesInMemory);
+            d.maxToolCalls = Env.getIntWithAliases(EnvKeys.MAX_TOOL_CALLS,
+                    EnvKeys.DEPRECATED_ALIASES.get(EnvKeys.MAX_TOOL_CALLS), d.maxToolCalls);
+            d.temperature = Env.getDoubleWithAliases(EnvKeys.DEFAULT_TEMPERATURE,
+                    EnvKeys.DEPRECATED_ALIASES.get(EnvKeys.DEFAULT_TEMPERATURE), d.temperature);
+            d.toolOutputTruncationKB = Env.getIntWithAliases(EnvKeys.TOOL_OUTPUT_TRUNCATION_KB,
+                    EnvKeys.DEPRECATED_ALIASES.get(EnvKeys.TOOL_OUTPUT_TRUNCATION_KB), d.toolOutputTruncationKB);
+            d.maxTokensInMemory = Env.getIntWithAliases(EnvKeys.MAX_TOKENS_IN_MEMORY,
+                    EnvKeys.DEPRECATED_ALIASES.get(EnvKeys.MAX_TOKENS_IN_MEMORY), d.maxTokensInMemory);
         }
-        if (cfg.agentRoles != null) {
-            cfg.agentRoles.values().forEach(r -> {
-                if (r.systemPrompt != null) {
-                    r.systemPrompt = resolveString(r.systemPrompt);
+
+        if (cfg.providers != null) {
+            cfg.providers.forEach(this::applyProviderOverrides);
+        }
+
+        if (cfg.hooks != null && cfg.hooks.trustProject != null) {
+            cfg.hooks.trustProject = Env.getWithAliases(EnvKeys.TRUST_PROJECT,
+                    EnvKeys.DEPRECATED_ALIASES.get(EnvKeys.TRUST_PROJECT), cfg.hooks.trustProject);
+        }
+    }
+
+    private void applyProviderOverrides(String name, AgentConfig.ProviderConfig p) {
+        String upper = name.toUpperCase();
+        p.baseUrl = Env.getWithAliases(EnvKeys.provider(name, EnvKeys.SUFFIX_BASE_URL),
+                EnvKeys.DEPRECATED_ALIASES.get(EnvKeys.provider(name, EnvKeys.SUFFIX_BASE_URL)), p.baseUrl);
+        p.modelName = Env.getWithAliases(EnvKeys.provider(name, EnvKeys.SUFFIX_MODEL),
+                EnvKeys.DEPRECATED_ALIASES.get(EnvKeys.provider(name, EnvKeys.SUFFIX_MODEL)), p.modelName);
+        p.temperature = Env.getDoubleWithAliases(EnvKeys.provider(name, EnvKeys.SUFFIX_TEMPERATURE),
+                EnvKeys.DEPRECATED_ALIASES.get(EnvKeys.provider(name, EnvKeys.SUFFIX_TEMPERATURE)), p.temperature);
+        p.maxTokens = Env.getIntWithAliases(EnvKeys.provider(name, EnvKeys.SUFFIX_MAX_TOKENS),
+                EnvKeys.DEPRECATED_ALIASES.get(EnvKeys.provider(name, EnvKeys.SUFFIX_MAX_TOKENS)), p.maxTokens);
+        p.timeoutSeconds = Env.getIntWithAliases(EnvKeys.provider(name, EnvKeys.SUFFIX_TIMEOUT_SECONDS),
+                EnvKeys.DEPRECATED_ALIASES.get(EnvKeys.provider(name, EnvKeys.SUFFIX_TIMEOUT_SECONDS)), p.timeoutSeconds);
+        p.maxRetries = Env.getIntWithAliases(EnvKeys.provider(name, EnvKeys.SUFFIX_MAX_RETRIES),
+                new String[]{EnvKeys.MAX_RETRIES, "BABY_COMMANDER_MAX_RETRIES"}, p.maxRetries);
+        p.embeddingModel = Env.getWithAliases(EnvKeys.provider(name, EnvKeys.SUFFIX_EMBEDDING_MODEL),
+                EnvKeys.DEPRECATED_ALIASES.get(EnvKeys.provider(name, EnvKeys.SUFFIX_EMBEDDING_MODEL)), p.embeddingModel);
+        p.apiKey = resolveApiKey(name, p.apiKey);
+    }
+
+    /**
+     * API key resolution: {@code BCMD_<PROVIDER>_API_KEY} → conventional fallback
+     * (e.g. {@code OPENAI_API_KEY}) → YAML value (usually empty).
+     */
+    private String resolveApiKey(String providerName, String yamlValue) {
+        String primary = EnvKeys.provider(providerName, EnvKeys.SUFFIX_API_KEY);
+        String v = Env.get(primary);
+        if (v != null) {
+            return v;
+        }
+        String conventional = EnvKeys.API_KEY_FALLBACKS.get(providerName);
+        if (conventional != null) {
+            v = Env.get(conventional);
+            if (v != null) {
+                return v;
+            }
+        }
+        return yamlValue;
+    }
+
+    // ------------------------------------------------------------------
+    // Validation & diagnostics
+    // ------------------------------------------------------------------
+
+    private void validate(AgentConfig cfg) {
+        if (cfg.defaultModel == null || cfg.defaultModel.isBlank()) {
+            Log.warnf("No defaultModel configured in %s", configPath);
+        } else if (cfg.providers == null || !cfg.providers.containsKey(cfg.defaultModel)) {
+            Log.warnf("defaultModel '%s' is not defined in providers: %s",
+                    cfg.defaultModel, cfg.providers != null ? cfg.providers.keySet() : "none");
+        }
+        if (cfg.providers != null) {
+            cfg.providers.forEach((name, p) -> {
+                if (isBlank(p.apiKey) && !isLocalOllama(p)) {
+                    Log.warnf("Provider '%s' has no apiKey configured. Set %s or %s.",
+                            name, EnvKeys.provider(name, EnvKeys.SUFFIX_API_KEY),
+                            EnvKeys.API_KEY_FALLBACKS.getOrDefault(name, "the provider's conventional key"));
+                }
+                if (p.maxTokens <= 0) {
+                    Log.warnf("Provider '%s' has invalid maxTokens=%d (must be > 0)", name, p.maxTokens);
+                }
+                if (p.temperature < 0.0 || p.temperature > 1.0) {
+                    Log.warnf("Provider '%s' has invalid temperature=%s (must be 0..1)", name, p.temperature);
+                }
+                if (p.timeoutSeconds <= 0) {
+                    Log.warnf("Provider '%s' has invalid timeoutSeconds=%d (must be > 0)", name, p.timeoutSeconds);
+                }
+                if (p.maxRetries < 0) {
+                    Log.warnf("Provider '%s' has invalid maxRetries=%d (must be >= 0)", name, p.maxRetries);
                 }
             });
         }
-        // Allow overriding the in-scope trust mode via the
-        // BABY_COMMANDER_TRUST_PROJECT environment variable, e.g.
-        // "strict" or "auto" (see AgentConfig.TrustProjectMode).
-        if (cfg.hooks != null && cfg.hooks.trustProject != null) {
-            cfg.hooks.trustProject = resolveString(cfg.hooks.trustProject);
+    }
+
+    private boolean isLocalOllama(AgentConfig.ProviderConfig p) {
+        if (p.baseUrl == null) {
+            return false;
+        }
+        String url = p.baseUrl.toLowerCase();
+        return url.contains("localhost") || url.contains("127.0.0.1") || url.contains("0.0.0.0");
+    }
+
+    private boolean isBlank(String s) {
+        return s == null || s.isBlank();
+    }
+
+    /** Logs the effective configuration with apiKey values redacted. */
+    private void logEffectiveConfig(AgentConfig cfg) {
+        Log.infof("Effective config: defaultModel=%s, workspaceRoot=%s, skipConfirmWorkspace=%s",
+                cfg.defaultModel, cfg.workspaceRoot, cfg.skipConfirmWorkspace);
+        if (cfg.providers != null) {
+            cfg.providers.forEach((name, p) -> Log.infof(
+                    "  provider[%s] type=%s model=%s baseUrl=%s apiKey=%s maxTokens=%d timeout=%ds retries=%d",
+                    name, p.type, p.modelName, p.baseUrl, Env.redact(p.apiKey),
+                    p.maxTokens, p.timeoutSeconds, p.maxRetries));
+        }
+        if (cfg.agentRoles != null) {
+            cfg.agentRoles.forEach((role, r) -> Log.infof("  role[%s] provider=%s", role, r.provider));
         }
     }
 
@@ -159,48 +278,5 @@ public class YamlConfigLoader {
             }
         }
         Log.infof("Compiled %d pattern groups", cfg.hooks.patterns.size());
-    }
-
-    private void resolveEnvVars(AgentConfig.ProviderConfig p) {
-        if (p.apiKey != null) {
-            p.apiKey = resolveString(p.apiKey);
-        }
-        if (p.baseUrl != null) {
-            p.baseUrl = resolveString(p.baseUrl);
-        }
-    }
-
-    private String resolveString(String value) {
-        if (value == null || !value.contains("${")) {
-            return value;
-        }
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\$\\{([^}]+)\\}").matcher(value);
-        StringBuilder sb = new StringBuilder();
-        while (m.find()) {
-            String token = m.group(1);
-            int colon = token.indexOf(':');
-            String varName = colon >= 0 ? token.substring(0, colon) : token;
-            String defaultValue = colon >= 0 ? token.substring(colon + 1) : "";
-            String resolved = lookup(varName);
-            m.appendReplacement(sb,
-                    java.util.regex.Matcher.quoteReplacement(resolved != null ? resolved : defaultValue));
-        }
-        m.appendTail(sb);
-        return sb.toString();
-    }
-
-    /**
-     * Looks up a value by name, checking system properties first (so {@code -DVAR=...}
-     * command-line flags take precedence) then environment variables.
-     *
-     * @return the resolved value, or {@code null} if neither a system property nor an
-     *         environment variable is set for the given name.
-     */
-    private String lookup(String varName) {
-        String sysProp = System.getProperty(varName);
-        if (sysProp != null && !sysProp.isEmpty()) {
-            return sysProp;
-        }
-        return System.getenv(varName);
     }
 }

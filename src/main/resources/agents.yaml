@@ -1,13 +1,24 @@
-defaultModel: "${BABY_COMMANDER_DEFAULT_MODEL:ocdeepseek}"
-workspaceRoot: "${BABY_COMMANDER_WORKSPACE_ROOT:/Users/yangtao/local-repo}"
-skipConfirmWorkspace: ${BABY_COMMANDER_SKIP_CONFIRM_WORKSPACE:false}
+# agents.yaml — central agent/provider configuration.
+#
+# Values here are PLAIN DEFAULTS. They can be overridden by environment
+# variables (typed, empty -> default) with the BCMD_ prefix, e.g.
+#   BCMD_DEFAULT_MODEL=deepseek
+#   BCMD_OPENAI_API_KEY=sk-...
+#   BCMD_OCDEEPSEEK_MODEL=deepseek-v4-flash
+# Secrets (apiKey) are normally provided via environment variables or
+# ~/.babycommander/.env — never commit them here.
+#
+# See docs/env-vars-improvement.md and README.md for the full env var table.
+defaultModel: ocdeepseek
+workspaceRoot: /Users/yangtao/local-repo
+skipConfirmWorkspace: false
 
 agentDefaults:
-  maxMessagesInMemory: ${BABY_COMMANDER_MAX_MESSAGES_IN_MEMORY:100}
-  maxToolCalls: ${BABY_COMMANDER_MAX_TOOL_CALLS:80}
-  temperature: ${BABY_COMMANDER_DEFAULT_TEMPERATURE:0.7}
-  toolOutputTruncationKB: ${BABY_COMMANDER_TOOL_OUTPUT_TRUNCATION_KB:5}
-  maxTokensInMemory: ${BABY_COMMANDER_MAX_TOKENS_IN_MEMORY:40000}
+  maxMessagesInMemory: 100
+  maxToolCalls: 80
+  temperature: 0.7
+  toolOutputTruncationKB: 5
+  maxTokensInMemory: 40000
 
   # Embeddings (semantic task search) are only attempted when a provider declares an
   # `embeddingModel`. Set it to a real embedding model on an OpenAI-compatible or
@@ -18,73 +29,73 @@ agentDefaults:
 providers:
   openai:
     type: openai
-    baseUrl: "${BABY_COMMANDER_OPENAI_BASE_URL:https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1}"
-    apiKey: "${OPENAI_API_KEY}"
-    modelName: "${BABY_COMMANDER_OPENAI_MODEL:glm-5.2}"
+    baseUrl: https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1
+    apiKey: ""
+    modelName: glm-5.2
     # embeddingModel: "text-embedding-v4"
-    temperature: ${BABY_COMMANDER_OPENAI_TEMPERATURE:0.7}
-    maxTokens: ${BABY_COMMANDER_OPENAI_MAX_TOKENS:30720}
-    maxRetries: ${BABY_COMMANDER_MAX_RETRIES:2}
-    timeoutSeconds: ${BABY_COMMANDER_OPENAI_TIMEOUT_SECONDS:300}
+    temperature: 0.7
+    maxTokens: 30720
+    maxRetries: 2
+    timeoutSeconds: 300
 
   anthropic:
     type: anthropic
-    apiKey: "${ANTHROPIC_API_KEY}"
-    modelName: "${BABY_COMMANDER_ANTHROPIC_MODEL:claude-3-5-sonnet-20241022}"
-    temperature: ${BABY_COMMANDER_ANTHROPIC_TEMPERATURE:0.7}
-    maxRetries: ${BABY_COMMANDER_MAX_RETRIES:2}
-    maxTokens: ${BABY_COMMANDER_ANTHROPIC_MAX_TOKENS:8192}
-    timeoutSeconds: ${BABY_COMMANDER_ANTHROPIC_TIMEOUT_SECONDS:300}
+    apiKey: ""
+    modelName: claude-3-5-sonnet-20241022
+    temperature: 0.7
+    maxRetries: 2
+    maxTokens: 8192
+    timeoutSeconds: 300
 
   ollama:
     type: ollama
-    baseUrl: "${BABY_COMMANDER_OLLAMA_BASE_URL:https://integrate.api.nvidia.com/v1}"
-    modelName: "${BABY_COMMANDER_OLLAMA_MODEL:meta/llama-3.3-70b-instruct}"
-    maxRetries: ${BABY_COMMANDER_MAX_RETRIES:2}
-    temperature: ${BABY_COMMANDER_OLLAMA_TEMPERATURE:0.7}
-    maxTokens: ${BABY_COMMANDER_OLLAMA_MAX_TOKENS:20480}
-    timeoutSeconds: ${BABY_COMMANDER_OLLAMA_TIMEOUT_SECONDS:300}
-    apiKey: "${OLLAMA_KEY}"
+    baseUrl: https://integrate.api.nvidia.com/v1
+    modelName: meta/llama-3.3-70b-instruct
+    maxRetries: 2
+    temperature: 0.7
+    maxTokens: 20480
+    timeoutSeconds: 300
+    apiKey: ""
 
   deepseek:
     type: deepseek
-    baseUrl: "${BABY_COMMANDER_DEEPSEEK_BASE_URL:https://api.deepseek.com}"
-    apiKey: "${DEEPSEEK_API_KEY}"
-    maxRetries: ${BABY_COMMANDER_MAX_RETRIES:2}
-    modelName: "${BABY_COMMANDER_DEEPSEEK_MODEL:deepseek-v4-flash}"
-    temperature: ${BABY_COMMANDER_DEEPSEEK_TEMPERATURE:0.7}
-    maxTokens: ${BABY_COMMANDER_DEEPSEEK_MAX_TOKENS:30720}
-    timeoutSeconds: ${BABY_COMMANDER_DEEPSEEK_TIMEOUT_SECONDS:300}
+    baseUrl: https://api.deepseek.com
+    apiKey: ""
+    maxRetries: 2
+    modelName: deepseek-v4-flash
+    temperature: 0.7
+    maxTokens: 30720
+    timeoutSeconds: 300
 
   ocdeepseek:
     type: deepseek
-    baseUrl: "${BABY_COMMANDER_DEEPSEEK_BASE_URL:https://opencode.ai/zen/go/v1}"
-    apiKey: "${OPENCODE_API_KEY}"
-    maxRetries: ${BABY_COMMANDER_MAX_RETRIES:3}
-    modelName: "${BABY_COMMANDER_DEEPSEEK_MODEL:deepseek-v4-flash}"
-    temperature: ${BABY_COMMANDER_DEEPSEEK_TEMPERATURE:0.5}
-    maxTokens: ${BABY_COMMANDER_DEEPSEEK_MAX_TOKENS:30720}
-    timeoutSeconds: ${BABY_COMMANDER_DEEPSEEK_TIMEOUT_SECONDS:300}
+    baseUrl: https://opencode.ai/zen/go/v1
+    apiKey: ""
+    maxRetries: 3
+    modelName: deepseek-v4-flash
+    temperature: 0.5
+    maxTokens: 30720
+    timeoutSeconds: 300
 
   qwen:
     type: openai
-    baseUrl: "${BABY_COMMANDER_QWEN_BASE_URL:https://coding.dashscope.aliyuncs.com/v1}"
-    maxRetries: ${BABY_COMMANDER_MAX_RETRIES:2}
-    apiKey: "${OPENAI_API_KEY}"
-    modelName: "${BABY_COMMANDER_QWEN_MODEL:qwen3.6-plus}"
-    temperature: ${BABY_COMMANDER_QWEN_TEMPERATURE:0.7}
-    maxTokens: ${BABY_COMMANDER_QWEN_MAX_TOKENS:20480}
-    timeoutSeconds: ${BABY_COMMANDER_QWEN_TIMEOUT_SECONDS:300}
+    baseUrl: https://coding.dashscope.aliyuncs.com/v1
+    maxRetries: 2
+    apiKey: ""
+    modelName: qwen3.6-plus
+    temperature: 0.7
+    maxTokens: 20480
+    timeoutSeconds: 300
 
   opencode:
     type: openai
-    maxRetries: ${BABY_COMMANDER_MAX_RETRIES:2}
-    baseUrl: "${BABY_COMMANDER_OC_BASE_URL:https://opencode.ai/zen/go/v1}"
-    apiKey: "${OPENCODE_API_KEY}"
-    modelName: "${BABY_COMMANDER_OC_MODEL:gpt-5.6-luna}"
-    temperature: ${BABY_COMMANDER_OC_TEMPERATURE:0.5}
-    maxTokens: ${BABY_COMMANDER_OC_MAX_TOKENS:30720}
-    timeoutSeconds: ${BABY_COMMANDER_OC_TIMEOUT_SECONDS:300}
+    maxRetries: 2
+    baseUrl: https://opencode.ai/zen/go/v1
+    apiKey: ""
+    modelName: gpt-5.6-luna
+    temperature: 0.5
+    maxTokens: 30720
+    timeoutSeconds: 300
 
 mcp:
   servers: {}

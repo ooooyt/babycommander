@@ -86,15 +86,22 @@ environment variables:
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `BABY_COMMANDER_DEFAULT_MODEL` | Default provider key | `openai` |
-| `BABY_COMMANDER_WORKSPACE_ROOT` | Workspace root directory | — |
-| `BABY_COMMANDER_SKIP_CONFIRM_WORKSPACE` | Skip workspace confirmation | `false` |
-| `OPENAI_API_KEY` | OpenAI/Qwen-compatible key | — |
-| `ANTHROPIC_API_KEY` | Anthropic key | — |
-| `DEEPSEEK_API_KEY` | DeepSeek key | — |
-| `OLLAMA_KEY` | Ollama/NVIDIA endpoint key | — |
-| `BABY_COMMANDER_<PROVIDER>_BASE_URL` / `_MODEL` / `_TEMPERATURE` / `_MAX_TOKENS` / `_TIMEOUT_SECONDS` | Per-provider overrides | see file |
-| `BABY_COMMANDER_MAX_MESSAGES_IN_MEMORY`, `BABY_COMMANDER_MAX_TOOL_CALLS`, `BABY_COMMANDER_MAX_TOKENS_IN_MEMORY`, `BABY_COMMANDER_TOOL_OUTPUT_TRUNCATION_KB` | Memory/token limits | see file |
+| `BCMD_DEFAULT_MODEL` | Default provider key | `ocdeepseek` |
+| `BCMD_WORKSPACE_ROOT` | Workspace root directory | — |
+| `BCMD_SKIP_CONFIRM_WORKSPACE` | Skip workspace confirmation | `false` |
+| `BCMD_TRUST_PROJECT` | In-scope trust mode (`auto`/`always`/`strict`) | `auto` |
+| `BCMD_MAX_RETRIES` | Global retry fallback for all providers | `2` |
+| `BCMD_<PROVIDER>_API_KEY` | Provider API key. Fallbacks: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`, `OLLAMA_KEY`, `OPENCODE_API_KEY` | — |
+| `BCMD_<PROVIDER>_BASE_URL` / `_MODEL` / `_TEMPERATURE` / `_MAX_TOKENS` / `_TIMEOUT_SECONDS` / `_MAX_RETRIES` / `_EMBEDDING_MODEL` | Per-provider overrides (`<PROVIDER>` = key in `agents.yaml`, e.g. `OPENCODE`, `OCDEEPSEEK`) | see file |
+| `BCMD_MAX_MESSAGES_IN_MEMORY`, `BCMD_MAX_TOOL_CALLS`, `BCMD_MAX_TOKENS_IN_MEMORY`, `BCMD_TOOL_OUTPUT_TRUNCATION_KB`, `BCMD_DEFAULT_TEMPERATURE` | Memory/token limits | see file |
+| `BCMD_SHGUARD_DISABLED` | Disable SH-GUARD (fall back to legacy analyzer) | `false` |
+
+Environment variables are resolved with **empty → default** semantics (an empty
+value is treated as unset). Lookup precedence (low → high): YAML default →
+`~/.babycommander/.env` → process environment → system property. Secrets can be
+stored in `~/.babycommander/.env` (must be `chmod 600`; a project-local `.env`
+is **never** loaded and triggers a startup warning). Legacy
+`BABY_COMMANDER_*` / `OC_*` names still work but print a deprecation warning.
 
 ### `application.properties`
 
@@ -124,7 +131,7 @@ resists obfuscation that defeats naive token scanning:
 
 The legacy token-based implementation is preserved in
 `ShellCommandAnalyzerLegacy` and can be re-enabled for hot rollback with
-`BABY_COMMANDER_SHGUARD_DISABLED=true`.
+`BCMD_SHGUARD_DISABLED=true`.
 
 SH-GUARD classifies each simple command with project-root context (the current
 project folder), following three rules:
@@ -157,7 +164,7 @@ so benign commands no longer prompt on every continued execution.
 By default, operations confined to the current project folder (e.g. editing files
 or running build commands that only touch the project) are trusted automatically
 and run without a confirmation prompt — unless they are classified **dangerous**.
-Set `trustProject` in `hooks.yaml` (or the `BABY_COMMANDER_TRUST_PROJECT`
+Set `trustProject` in `hooks.yaml` (or the `BCMD_TRUST_PROJECT`
 environment variable) to one of:
 
 - `auto` (default) — auto-allow in-scope `ask_once` operations; prompt only for

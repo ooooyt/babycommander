@@ -72,7 +72,7 @@ public class AgentFactory {
         this(configLoader, toolRegistry, sessionMemory, lifecycle, conversationCompactor, null);
     }
 
-    private AgentConfig config() {
+    public AgentConfig config() {
         return configLoader.getConfig();
     }
 

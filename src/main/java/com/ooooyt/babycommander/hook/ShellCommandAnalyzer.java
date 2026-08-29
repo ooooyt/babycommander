@@ -14,11 +14,13 @@ import com.ooooyt.babycommander.shguard.ShGuard;
  *
  * <p>The legacy token-based implementation is preserved in
  * {@link ShellCommandAnalyzerLegacy} and can be re-enabled for hot rollback by
- * setting the system property {@code BABY_COMMANDER_SHGUARD_DISABLED=true}.</p>
+ * setting the system property {@code BCMD_SHGUARD_DISABLED=true} (the legacy
+ * {@code BABY_COMMANDER_SHGUARD_DISABLED} name is still honored).</p>
  */
 public final class ShellCommandAnalyzer {
 
-    private static final String DISABLE_PROPERTY = "BABY_COMMANDER_SHGUARD_DISABLED";
+    private static final String DISABLE_PROPERTY = "BCMD_SHGUARD_DISABLED";
+    private static final String DISABLE_PROPERTY_LEGACY = "BABY_COMMANDER_SHGUARD_DISABLED";
 
     private ShellCommandAnalyzer() {
     }
@@ -60,6 +62,8 @@ public final class ShellCommandAnalyzer {
 
     private static boolean isDisabled() {
         return Boolean.getBoolean(DISABLE_PROPERTY)
-                || "true".equalsIgnoreCase(System.getenv("BABY_COMMANDER_SHGUARD_DISABLED"));
+                || "true".equalsIgnoreCase(System.getenv(DISABLE_PROPERTY))
+                || Boolean.getBoolean(DISABLE_PROPERTY_LEGACY)
+                || "true".equalsIgnoreCase(System.getenv(DISABLE_PROPERTY_LEGACY));
     }
 }

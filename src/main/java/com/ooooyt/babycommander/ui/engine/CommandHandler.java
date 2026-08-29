@@ -6,6 +6,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
+import com.ooooyt.babycommander.config.AgentConfig;
+import com.ooooyt.babycommander.config.Env;
 import com.ooooyt.babycommander.db.entity.ProjectEntity;
 import com.ooooyt.babycommander.db.entity.TaskEntity;
 import com.ooooyt.babycommander.util.I18n;
@@ -59,6 +61,10 @@ public class CommandHandler {
 
         if (command.equals("/history")) {
             handleHistoryCommand(task);
+            return;
+        }
+        if (command.equals("/config")) {
+            handleConfigCommand();
             return;
         }
 
@@ -295,6 +301,23 @@ public class CommandHandler {
         }
         String projectId = tasks.get(0).projectId;
         return ctx.projectTaskService().searchProjectTasksSemantic(projectId, query, 10);
+    }
+
+    private void handleConfigCommand() {
+        AgentConfig cfg = ctx.agentFactory().config();
+        ctx.eventBus().publish(EngineContext.UI_EVENT_ADDRESS,
+            new UiEvent.MessageOutput(I18n.tr(MessageKey.CHAT_CONFIG_HEADER), UiEvent.MessageType.PLAIN));
+        ctx.eventBus().publish(EngineContext.UI_EVENT_ADDRESS,
+            new UiEvent.MessageOutput(I18n.tr(MessageKey.CHAT_CONFIG_DEFAULT_MODEL, cfg.defaultModel), UiEvent.MessageType.PLAIN));
+        if (cfg.providers != null) {
+            cfg.providers.forEach((name, p) -> ctx.eventBus().publish(EngineContext.UI_EVENT_ADDRESS,
+                new UiEvent.MessageOutput(I18n.tr(MessageKey.CHAT_CONFIG_PROVIDER,
+                    name, p.type, p.modelName, p.baseUrl, Env.redact(p.apiKey)), UiEvent.MessageType.PLAIN)));
+        }
+        if (cfg.agentRoles != null) {
+            cfg.agentRoles.forEach((role, r) -> ctx.eventBus().publish(EngineContext.UI_EVENT_ADDRESS,
+                new UiEvent.MessageOutput(I18n.tr(MessageKey.CHAT_CONFIG_ROLE, role, r.provider), UiEvent.MessageType.PLAIN)));
+        }
     }
 
     private void printSlashHelp() {

@@ -29,3 +29,7 @@ objectbox-models/*.bak
 # Scratch / debug artifacts
 dep-tree.txt
 docs/temp/
+
+# Secrets — never commit .env files (use ~/.babycommander/.env instead)
+.env
+*.env

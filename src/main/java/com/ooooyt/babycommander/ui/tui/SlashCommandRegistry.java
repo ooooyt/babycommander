@@ -48,6 +48,7 @@ public final class SlashCommandRegistry {
         list.add(new SlashCommand("/workspace", I18n.tr(MessageKey.CHAT_WORKSPACE_USAGE)));
         list.add(new SlashCommand("/history",  I18n.tr(MessageKey.CHAT_HELP_HISTORY)));
         list.add(new SlashCommand("/cnc",      I18n.tr(MessageKey.CHAT_HELP_CNC)));
+        list.add(new SlashCommand("/config",   I18n.tr(MessageKey.CHAT_HELP_CONFIG)));
         list.add(new SlashCommand("/help",     I18n.tr(MessageKey.CHAT_HELP_HELP)));
         list.add(new SlashCommand("/exit",     I18n.tr(MessageKey.CHAT_HELP_EXIT)));
         list.add(new SlashCommand("/quit",     I18n.tr(MessageKey.CHAT_HELP_QUIT)));
