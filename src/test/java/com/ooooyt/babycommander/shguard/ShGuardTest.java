@@ -86,6 +86,12 @@ class ShGuardTest {
         "mvn test | tee build.log; echo done",
         "wc -l src/main/java/com/ooooyt/babycommander/tool/*.java; echo done",
         "wc -l src/main/java/com/ooooyt/babycommander/tool/*.java src/main/java/com/ooooyt/babycommander/editloop/*.java src/main/java/com/ooooyt/babycommander/intent/*.java src/main/java/com/ooooyt/babycommander/orchestrator/*.java; echo done",
+        // Arithmetic expansion $((...)) is NOT a command substitution.
+        "echo $((1+2))",
+        "echo $(( 1 + 2 ))",
+        "echo sum=$((a + b))",
+        "echo $(( $(wc -l < file.txt) + 1 ))",
+        "ls; echo $((2*3))",
         // Compound cd/git/echo/head chains with stderr redirects and '--' arg.
         "cd /Users/yangtao/local-repo/babycommander && git log --oneline -5 2>/dev/null; echo \"---\"; git status --short 2>/dev/null | head -20; echo \"---\"; git log --oneline -3 -- docs/bug-scan-report.md 2>/dev/null",
         "cd /proj && git log --oneline -5 2>/dev/null; echo ---; git status --short | head -20"
@@ -136,6 +142,15 @@ class ShGuardTest {
         "git checkout -- src/Foo.java",
         "git branch -D feature",
         "git rm file.txt",
+        "git clean -fdx",
+        "git push --delete origin main",
+        "git push origin :branch",
+        "git stash drop",
+        "git stash clear",
+        "git tag -d v1.0",
+        "git update-ref -d refs/heads/main",
+        "> /etc/crontab",
+        "FOO=bar > /etc/crontab",
         "apt remove nginx",
         "apt purge nginx",
         "dpkg -r nginx",

@@ -192,21 +192,21 @@ public final class ShWord {
                 continue;
             }
 
-            // Command substitution $(...)
-            if (c == '$' && i + 1 < n && raw.charAt(i + 1) == '(') {
-                int end = findMatchingParen(raw, i + 1);
-                if (end >= 0) {
-                    out.add(new Part(PartKind.COMMAND_SUBST, raw.substring(i, end + 1), false, false));
-                    i = end + 1;
-                    continue;
-                }
-            }
-
             // Arithmetic expansion $((...))
             if (c == '$' && i + 2 < n && raw.charAt(i + 1) == '(' && raw.charAt(i + 2) == '(') {
                 int end = findMatchingParen(raw, i + 1);
                 if (end >= 0) {
                     out.add(new Part(PartKind.ARITHMETIC, raw.substring(i, end + 1), false, false));
+                    i = end + 1;
+                    continue;
+                }
+            }
+
+            // Command substitution $(...)
+            if (c == '$' && i + 1 < n && raw.charAt(i + 1) == '(') {
+                int end = findMatchingParen(raw, i + 1);
+                if (end >= 0) {
+                    out.add(new Part(PartKind.COMMAND_SUBST, raw.substring(i, end + 1), false, false));
                     i = end + 1;
                     continue;
                 }

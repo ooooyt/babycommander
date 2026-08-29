@@ -191,7 +191,14 @@ public final class ShGuard {
         @Override
         public Void visitSimple_command(Simple_commandContext ctx) {
             List<ShWord> words = collectWords(ctx);
-            List<RedirectContext> redirects = ctx.redirect();
+            List<RedirectContext> redirects = new ArrayList<>(ctx.redirect());
+            // Redirects consumed as prefixes (e.g. "> /etc/crontab" with no
+            // command word) are children of PrefixContext, not direct children.
+            for (PrefixContext pfx : ctx.prefix()) {
+                if (pfx.redirect() != null) {
+                    redirects.add(pfx.redirect());
+                }
+            }
 
             // Redirection safety (applies even with no command words).
             if (checkWriteRedirects(redirects, ctx)) {
@@ -463,12 +470,21 @@ public final class ShGuard {
             List<String> deq = dequotedWords(words);
             for (int i = 0; i < deq.size(); i++) {
                 String t = deq.get(i);
-                if (t.equals("push") && hasFlagAfter(deq, i, "--force", "-f")) {
-                    return true;
-                }
-                if (t.equals("push") && hasFlagAfter(deq, i, "--force-with-lease")) {
-                    // Force-with-lease is still a force push — flag as dangerous.
-                    return true;
+                if (t.equals("push")) {
+                    // Force push (any spelling) is destructive.
+                    if (hasFlagAfter(deq, i, "--force", "-f", "--force-with-lease")) {
+                        return true;
+                    }
+                    // Deleting a remote branch: `git push --delete` / `-d`,
+                    // or a delete refspec like `git push origin :branch`.
+                    if (hasFlagAfter(deq, i, "--delete", "-d")) {
+                        return true;
+                    }
+                    for (int j = i + 1; j < deq.size(); j++) {
+                        if (deq.get(j).startsWith(":")) {
+                            return true;
+                        }
+                    }
                 }
                 if (t.equals("reset") && hasFlagAfter(deq, i, "--hard")) {
                     return true;
@@ -476,7 +492,8 @@ public final class ShGuard {
                 if (t.equals("rebase") && hasFlagAfter(deq, i, "--onto")) {
                     return true;
                 }
-                if (t.equals("clean") && hasFlagAfter(deq, i, "-f", "--force", "-fd", "-df", "-x")) {
+                if (t.equals("clean") && (hasFlagAfter(deq, i, "-f", "--force", "-fd", "-df", "-x")
+                        || hasShortFlagCharAfter(deq, i, 'f'))) {
                     return true;
                 }
                 if (t.equals("checkout") && hasFlagAfter(deq, i, "--")) {
@@ -485,10 +502,16 @@ public final class ShGuard {
                 if (t.equals("branch") && hasFlagAfter(deq, i, "-D", "-d")) {
                     return true;
                 }
-                if (t.equals("rm")) {
+                if (t.equals("stash") && hasFlagAfter(deq, i, "drop", "clear")) {
                     return true;
                 }
-                if (t.equals("filter-branch")) {
+                if (t.equals("tag") && hasFlagAfter(deq, i, "-d", "--delete")) {
+                    return true;
+                }
+                if (t.equals("update-ref") && hasFlagAfter(deq, i, "-d", "--delete")) {
+                    return true;
+                }
+                if (t.equals("rm") || t.equals("filter-branch")) {
                     return true;
                 }
             }
@@ -500,6 +523,25 @@ public final class ShGuard {
                 for (String f : flags) {
                     if (tokens.get(j).equals(f)) {
                         return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        /**
+         * True when any token after {@code index} is a combined short option
+         * (e.g. {@code -fdx}) containing {@code flagChar}. Catches compact
+         * spellings like {@code git clean -fdx} that exact-token matching misses.
+         */
+        private boolean hasShortFlagCharAfter(List<String> tokens, int index, char flagChar) {
+            for (int j = index + 1; j < tokens.size(); j++) {
+                String t = tokens.get(j);
+                if (t.length() > 1 && t.charAt(0) == '-' && t.charAt(1) != '-') {
+                    for (int k = 1; k < t.length(); k++) {
+                        if (t.charAt(k) == flagChar) {
+                            return true;
+                        }
                     }
                 }
             }
