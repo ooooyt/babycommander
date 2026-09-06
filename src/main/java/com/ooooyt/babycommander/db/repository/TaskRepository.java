@@ -4,6 +4,7 @@ import com.ooooyt.babycommander.db.entity.TaskEntity;
 import com.ooooyt.babycommander.db.entity.TaskEntity_;
 import io.objectbox.Box;
 import io.objectbox.BoxStore;
+import io.objectbox.query.ObjectWithScore;
 import io.objectbox.query.QueryBuilder;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -64,11 +65,16 @@ public class TaskRepository {
      * @return tasks ordered by similarity (most similar first)
      */
     public List<TaskEntity> findNearestNeighbors(String projectId, float[] queryVector, int maxResults) {
+        // findWithScores() is required: plain find() does NOT guarantee ordering by
+        // distance for HNSW nearest-neighbor queries (ObjectBox docs).
         return box().query()
                 .equal(TaskEntity_.projectId, projectId, QueryBuilder.StringOrder.CASE_SENSITIVE)
                 .apply(TaskEntity_.embedding.nearestNeighbors(queryVector, maxResults))
                 .build()
-                .find();
+                .findWithScores()
+                .stream()
+                .map(ObjectWithScore::get)
+                .toList();
     }
 
     public List<TaskEntity> findAll() {

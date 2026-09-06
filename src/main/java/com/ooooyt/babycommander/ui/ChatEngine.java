@@ -143,6 +143,19 @@ public class ChatEngine {
 
         ctx.taskPersistenceConsumer().start(ctx.projectFolder());
 
+        // One-time migration: re-embed tasks whose stored embeddings are stale or
+        // missing (e.g. after the HNSW 1536 -> 512 dimension change). Runs in a
+        // background thread so startup is not blocked by the ONNX model load.
+        Thread reembedThread = new Thread(() -> {
+            try {
+                ctx.projectTaskService().reembedStaleEmbeddings();
+            } catch (Exception e) {
+                Log.warnf("Task embedding migration failed: %s", e.getMessage());
+            }
+        }, "task-embedding-migration");
+        reembedThread.setDaemon(true);
+        reembedThread.start();
+
         ctx.eventBus().consumer(UI_COMMAND_ADDRESS, message -> {
             if (message.body() instanceof CommandEvent cmd) {
                 handleCommand(cmd);

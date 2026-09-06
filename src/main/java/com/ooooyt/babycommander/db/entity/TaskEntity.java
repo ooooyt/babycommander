@@ -10,6 +10,12 @@ import java.time.Instant;
 @Entity
 public class TaskEntity {
 
+    /**
+     * Embedding vector dimensions — must match the in-process ONNX embedding model
+     * (bge-small-zh-v1.5 = 512). Kept in sync with the HNSW index below.
+     */
+    public static final int EMBEDDING_DIMENSIONS = 512;
+
     public enum Status {
         STARTED, FAILED, COMPLETED
     }
@@ -41,7 +47,7 @@ public class TaskEntity {
      * Using COSINE distance type for semantic similarity.
      */
     @HnswIndex(
-        dimensions = 1536,
+        dimensions = EMBEDDING_DIMENSIONS,
         distanceType = VectorDistanceType.COSINE,
         neighborsPerNode = 30,
         indexingSearchCount = 200

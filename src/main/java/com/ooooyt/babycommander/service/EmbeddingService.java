@@ -5,6 +5,7 @@ import com.ooooyt.babycommander.config.AgentConfig;
 import com.ooooyt.babycommander.config.AgentConfig.ProviderConfig;
 import com.ooooyt.babycommander.config.YamlConfigLoader;
 import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.model.embedding.onnx.bgesmallzhv15.BgeSmallZhV15EmbeddingModel;
 import dev.langchain4j.model.ollama.OllamaEmbeddingModel;
 import dev.langchain4j.model.openai.OpenAiEmbeddingModel;
 import io.quarkus.logging.Log;
@@ -18,7 +19,9 @@ import java.util.Map;
  * Service for generating vector embeddings of text using the configured
  * LLM provider's embedding API.
  * <p>
- * Supports OpenAI-compatible and Ollama embedding providers.
+ * Supports OpenAI-compatible, Ollama, and in-process ONNX (bge-small-zh-v1.5)
+ * embedding providers. The ONNX model runs fully offline inside the JVM with
+ * no API key or network access.
  */
 @ApplicationScoped
 public class EmbeddingService {
@@ -28,6 +31,13 @@ public class EmbeddingService {
 
     /** Set once so the "no embedding provider configured" hint is logged only on first use. */
     private static volatile boolean noEmbeddingProviderLogged = false;
+
+    /**
+     * Cached in-process ONNX embedding model. The model (~94 MB) is loaded once
+     * per JVM and reused; building a new instance per embed() call would be fatal
+     * for ONNX because each construction pays the full model-load cost.
+     */
+    private static volatile EmbeddingModel cachedOnnxModel;
 
     @Inject
     YamlConfigLoader configLoader;
@@ -130,7 +140,7 @@ public class EmbeddingService {
     }
 
     private boolean supportsEmbeddings(String type) {
-        return "openai".equals(type) || "ollama".equals(type);
+        return "openai".equals(type) || "ollama".equals(type) || "onnx".equals(type);
     }
 
     private boolean isEmbeddingProvider(ProviderConfig c) {
@@ -154,6 +164,18 @@ public class EmbeddingService {
                     .modelName(c.embeddingModel != null ? c.embeddingModel : DEFAULT_OLLAMA_EMBEDDING_MODEL)
                     .timeout(timeout)
                     .build();
+            case "onnx" -> {
+                if (cachedOnnxModel == null) {
+                    synchronized (this) {
+                        if (cachedOnnxModel == null) {
+                            Log.info("EmbeddingService: loading in-process ONNX embedding model "
+                                    + "(bge-small-zh-v1.5, 512 dims) — first load may take a few seconds");
+                            cachedOnnxModel = new BgeSmallZhV15EmbeddingModel();
+                        }
+                    }
+                }
+                yield cachedOnnxModel;
+            }
             default -> {
                 Log.warnf("EmbeddingService: unsupported provider type '%s' for embeddings", c.type);
                 yield null;

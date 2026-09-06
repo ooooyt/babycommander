@@ -222,7 +222,52 @@ public class ProjectTaskService {
             Log.warn("EmbeddingService returned null, falling back to keyword search");
             return searchProjectTasks(projectId, query);
         }
-        return taskRepository.findNearestNeighbors(projectId, queryVector, maxResults);
+        // Cheap insurance: if the query vector dimension does not match the HNSW
+        // index dimension, nearestNeighbors would throw — fall back to keyword.
+        if (queryVector.length != TaskEntity.EMBEDDING_DIMENSIONS) {
+            Log.warnf("Embedding dimension mismatch: got %d, expected %d; falling back to keyword search",
+                    queryVector.length, TaskEntity.EMBEDDING_DIMENSIONS);
+            return searchProjectTasks(projectId, query);
+        }
+        try {
+            return taskRepository.findNearestNeighbors(projectId, queryVector, maxResults);
+        } catch (Exception e) {
+            // e.g. stale stored vectors with a different dimension still present before
+            // the startup re-embed migration finishes — never let semantic search crash.
+            Log.warnf("Semantic search failed (%s); falling back to keyword search",
+                    e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+            return searchProjectTasks(projectId, query);
+        }
+    }
+
+    /**
+     * Re-embeds tasks whose stored embedding is missing or has a stale dimension
+     * (e.g. after switching embedding models or a schema change such as the
+     * 1536 → 512 HNSW dimension migration). Runs once at startup; a no-op when
+     * every task already carries a correctly-dimensioned embedding.
+     *
+     * @return the number of tasks re-embedded
+     */
+    public int reembedStaleEmbeddings() {
+        List<TaskEntity> tasks = taskRepository.findAll();
+        int reembedded = 0;
+        for (TaskEntity task : tasks) {
+            if (task.embedding == null || task.embedding.length != TaskEntity.EMBEDDING_DIMENSIONS) {
+                float[] embedding = embeddingService.embed(task.name);
+                if (embedding != null) {
+                    task.embedding = embedding;
+                    task.updatedDatetime = System.currentTimeMillis();
+                    taskRepository.update(task);
+                    reembedded++;
+                } else {
+                    Log.debugf("reembedStaleEmbeddings: could not embed task '%s'", task.name);
+                }
+            }
+        }
+        if (reembedded > 0) {
+            Log.infof("Re-embedded %d task(s) with stale or missing embeddings", reembedded);
+        }
+        return reembedded;
     }
 
     // ──────────────────────────────────────────────

@@ -97,6 +97,13 @@ providers:
     maxTokens: 30720
     timeoutSeconds: 300
 
+  # Fully local, in-process ONNX embedding provider for semantic task search
+  # (bge-small-zh-v1.5, 512 dims). No API key, no network access. The chat
+  # modelName is never used for embeddings; only the embeddingModel key matters.
+  local-embed:
+    type: onnx
+    embeddingModel: "bge-small-zh-v15"
+
 mcp:
   servers: {}
 

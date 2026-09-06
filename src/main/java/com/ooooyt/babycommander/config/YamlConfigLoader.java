@@ -213,7 +213,7 @@ public class YamlConfigLoader {
         }
         if (cfg.providers != null) {
             cfg.providers.forEach((name, p) -> {
-                if (isBlank(p.apiKey) && !isLocalOllama(p)) {
+                if (isBlank(p.apiKey) && !isLocalOllama(p) && !"onnx".equals(p.type)) {
                     Log.warnf("Provider '%s' has no apiKey configured. Set %s or %s.",
                             name, EnvKeys.provider(name, EnvKeys.SUFFIX_API_KEY),
                             EnvKeys.API_KEY_FALLBACKS.getOrDefault(name, "the provider's conventional key"));
