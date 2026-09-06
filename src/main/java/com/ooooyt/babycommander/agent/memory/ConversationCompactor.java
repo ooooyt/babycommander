@@ -2,6 +2,7 @@ package com.ooooyt.babycommander.agent.memory;
 
 import com.ooooyt.babycommander.agent.DeepSeekChatModel;
 import com.ooooyt.babycommander.config.AgentConfig;
+import com.ooooyt.babycommander.config.SessionIdProvider;
 import com.ooooyt.babycommander.config.YamlConfigLoader;
 import com.ooooyt.babycommander.db.SummarizerConfig;
 import com.ooooyt.babycommander.util.TokenCounter;
@@ -21,6 +22,8 @@ import jakarta.inject.Inject;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @ApplicationScoped
 public class ConversationCompactor {
@@ -40,6 +43,10 @@ public class ConversationCompactor {
 
     @Inject
     YamlConfigLoader yamlConfigLoader;
+
+    /** App-lifetime session id header provider (null in plain unit tests). */
+    @Inject
+    SessionIdProvider sessionIdProvider;
 
     private final TokenCounter tokenCounter = new TokenCounter();
 
@@ -255,6 +262,7 @@ public class ConversationCompactor {
         }
 
         Duration timeout = Duration.ofSeconds(providerConfig.timeoutSeconds);
+        Map<String, String> sessionHeaders = sessionHeaders();
 
         return switch (providerConfig.type) {
             case "openai" -> OpenAiChatModel.builder()
@@ -264,6 +272,7 @@ public class ConversationCompactor {
                 .temperature(summarizerConfig.temperature())
                 .maxTokens(providerConfig.maxTokens)
                 .timeout(timeout)
+                .customHeaders(sessionHeaders)
                 .build();
             case "anthropic" -> AnthropicChatModel.builder()
                 .baseUrl(providerConfig.baseUrl == null || providerConfig.baseUrl.isEmpty() ? null : providerConfig.baseUrl)
@@ -272,6 +281,7 @@ public class ConversationCompactor {
                 .temperature(summarizerConfig.temperature())
                 .maxTokens(providerConfig.maxTokens)
                 .timeout(timeout)
+                .customHeaders(sessionHeaders)
                 .build();
             case "deepseek" -> DeepSeekChatModel.builder()
                 .baseUrl(providerConfig.baseUrl)
@@ -280,6 +290,7 @@ public class ConversationCompactor {
                 .temperature(summarizerConfig.temperature())
                 .maxTokens(providerConfig.maxTokens)
                 .timeout(timeout)
+                .customHeaders(sessionHeaders)
                 .build();
             case "ollama" -> OllamaChatModel.builder()
                 .baseUrl(providerConfig.baseUrl)
@@ -287,9 +298,32 @@ public class ConversationCompactor {
                 .temperature(summarizerConfig.temperature())
                 .numPredict(providerConfig.maxTokens)
                 .timeout(timeout)
+                .customHeaders(sessionHeaders)
                 .build();
             default -> throw new IllegalArgumentException("Unsupported provider: " + providerConfig.type);
         };
+    }
+
+    /**
+     * Session id HTTP header attached to every LLM request. The header name
+     * comes from agents.yaml {@code header.session.id.key} (default
+     * {@code x-opencode-session}) and the value is the app-lifetime UUID.
+     * Falls back to a per-call UUID when SessionIdProvider is not injected
+     * (plain unit tests).
+     */
+    private Map<String, String> sessionHeaders() {
+        if (sessionIdProvider != null) {
+            return sessionIdProvider.sessionHeaders();
+        }
+        try {
+            String key = yamlConfigLoader.getConfig().header.session.id.key;
+            if (key == null || key.isBlank()) {
+                return Map.of();
+            }
+            return Map.of(key, UUID.randomUUID().toString());
+        } catch (Exception e) {
+            return Map.of();
+        }
     }
 
     private String resolveDefaultProvider() {

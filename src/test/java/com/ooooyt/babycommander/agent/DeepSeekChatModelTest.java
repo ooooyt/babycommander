@@ -47,6 +47,19 @@ class DeepSeekChatModelTest {
     }
 
     @Test
+    @DisplayName("Builder should accept custom headers")
+    void testBuilderWithCustomHeaders() {
+        DeepSeekChatModel model = DeepSeekChatModel.builder()
+                .baseUrl("https://api.deepseek.com")
+                .apiKey("test-api-key")
+                .modelName("deepseek-chat")
+                .customHeaders(java.util.Map.of("x-opencode-session", "uuid-123"))
+                .build();
+
+        assertNotNull(model);
+    }
+
+    @Test
     @DisplayName("Builder should chain setters correctly")
     void testBuilderChaining() {
         var builder = DeepSeekChatModel.builder();

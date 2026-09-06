@@ -39,6 +39,15 @@ class YamlConfigLoaderTest {
     }
 
     @Test
+    void headerSessionIdKeyLoadedFromYaml() {
+        AgentConfig config = load();
+        assertNotNull(config.header);
+        assertNotNull(config.header.session);
+        assertNotNull(config.header.session.id);
+        assertEquals("x-opencode-session", config.header.session.id.key);
+    }
+
+    @Test
     void emptyEnvVarFallsBackToDefault() {
         System.setProperty("BCMD_MAX_TOKENS", "");
         AgentConfig config = load();

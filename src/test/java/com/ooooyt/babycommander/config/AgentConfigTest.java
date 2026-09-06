@@ -24,6 +24,15 @@ class AgentConfigTest {
     }
 
     @Test
+    void testHeaderSessionIdDefaults() {
+        AgentConfig config = new AgentConfig();
+        assertNotNull(config.header);
+        assertNotNull(config.header.session);
+        assertNotNull(config.header.session.id);
+        assertEquals("x-opencode-session", config.header.session.id.key);
+    }
+
+    @Test
     void testAgentDefaults() {
         AgentConfig.AgentDefaults defaults = new AgentConfig.AgentDefaults();
         assertEquals("openai", defaults.provider);

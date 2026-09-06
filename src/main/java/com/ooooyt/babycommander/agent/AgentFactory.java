@@ -6,6 +6,7 @@ import com.ooooyt.babycommander.agent.memory.ToolCallAwareChatMemory;
 import com.ooooyt.babycommander.config.AgentConfig;
 import com.ooooyt.babycommander.config.AgentConfig.ProviderConfig;
 import com.ooooyt.babycommander.config.YamlConfigLoader;
+import com.ooooyt.babycommander.config.SessionIdProvider;
 import com.ooooyt.babycommander.hook.SessionMemory;
 import com.ooooyt.babycommander.service.ProjectTaskService;
 import com.ooooyt.babycommander.tool.PlanTool;
@@ -33,6 +34,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @ApplicationScoped
@@ -44,6 +46,13 @@ public class AgentFactory {
     private final CodeGenLifecycle lifecycle;
     private final ConversationCompactor conversationCompactor;
     private final ProjectTaskService projectTaskService;
+
+    /**
+     * App-lifetime session id header provider (injected; null in plain unit
+     * tests that construct AgentFactory manually).
+     */
+    @Inject
+    SessionIdProvider sessionIdProvider;
     private final Map<String, AgentContext> activeAgents = new ConcurrentHashMap<>();
     private static final int SEQUENTIAL_TOOLS_LIMIT = 500;
 
@@ -268,6 +277,7 @@ public class AgentFactory {
     private ChatModel createModel(AgentConfig.ProviderConfig c) {
         Duration timeout = Duration.ofSeconds(c.timeoutSeconds);
         int maxRetries = resolveMaxRetries(c);
+        Map<String, String> sessionHeaders = sessionHeaders();
         ChatModel model = switch (c.type) {
             case "openai" -> OpenAiChatModel.builder()
                     .baseUrl(c.baseUrl == null || c.baseUrl.isEmpty() ? null : c.baseUrl)
@@ -277,6 +287,7 @@ public class AgentFactory {
                     .maxRetries(maxRetries)
                     .maxTokens(c.maxTokens)
                     .timeout(timeout)
+                    .customHeaders(sessionHeaders)
                     .returnThinking(false)
                     .build();
             case "deepseek" -> DeepSeekChatModel.builder()
@@ -287,6 +298,7 @@ public class AgentFactory {
                     .temperature(c.temperature)
                     .maxTokens(c.maxTokens)
                     .timeout(timeout)
+                    .customHeaders(sessionHeaders)
                     .build();
             case "anthropic" -> AnthropicChatModel.builder()
                     .baseUrl(c.baseUrl == null || c.baseUrl.isEmpty() ? null : c.baseUrl)
@@ -295,6 +307,7 @@ public class AgentFactory {
                     .temperature(c.temperature)
                     .maxTokens(c.maxTokens)
                     .timeout(timeout)
+                    .customHeaders(sessionHeaders)
                     .build();
             case "ollama" -> OllamaChatModel.builder()
                     .baseUrl(c.baseUrl)
@@ -302,12 +315,31 @@ public class AgentFactory {
                     .temperature(c.temperature)
                     .numPredict(c.maxTokens)
                     .timeout(timeout)
+                    .customHeaders(sessionHeaders)
                     .build();
             default -> throw new IllegalArgumentException(I18n.tr(MessageKey.AGENT_UNSUPPORTED_PROVIDER, c.type));
         };
         // Wrap so that descriptive text accompanying tool-call requests is
         // surfaced as a TOOL_CALL_TEXT status event before the tools run.
         return new ToolCallTextPublishingChatModel(model);
+    }
+
+    /**
+     * Session id HTTP header attached to every LLM request. The header name
+     * comes from agents.yaml {@code header.session.id.key} (default
+     * {@code x-opencode-session}) and the value is the app-lifetime UUID.
+     * Falls back to a per-call UUID when SessionIdProvider is not injected
+     * (plain unit tests).
+     */
+    private Map<String, String> sessionHeaders() {
+        if (sessionIdProvider != null) {
+            return sessionIdProvider.sessionHeaders();
+        }
+        String key = config().header.session.id.key;
+        if (key == null || key.isBlank()) {
+            return Map.of();
+        }
+        return Map.of(key, UUID.randomUUID().toString());
     }
 
     /**

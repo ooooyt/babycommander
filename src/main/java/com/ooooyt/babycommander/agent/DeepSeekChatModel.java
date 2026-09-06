@@ -31,6 +31,7 @@ import dev.langchain4j.model.output.TokenUsage;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import dev.langchain4j.internal.RetryUtils;
 
 import static dev.langchain4j.internal.Utils.isNullOrBlank;
@@ -52,13 +53,16 @@ public class DeepSeekChatModel implements ChatModel {
     }
 
     @Builder(builderClassName = "ModelBuilder", builderMethodName = "builder")
-    private static DeepSeekChatModel create(String baseUrl, String apiKey, String modelName, Double temperature, Integer maxTokens, Duration timeout, Integer maxRetries) {
-        OpenAiClient client = OpenAiClient.builder()
+    private static DeepSeekChatModel create(String baseUrl, String apiKey, String modelName, Double temperature, Integer maxTokens, Duration timeout, Integer maxRetries, Map<String, String> customHeaders) {
+        var clientBuilder = OpenAiClient.builder()
                 .baseUrl(baseUrl)
                 .apiKey(apiKey)
                 .connectTimeout(getOrDefault(timeout, Duration.ofSeconds(15)))
-                .readTimeout(getOrDefault(timeout, Duration.ofSeconds(60)))
-                .build();
+                .readTimeout(getOrDefault(timeout, Duration.ofSeconds(60)));
+        if (customHeaders != null && !customHeaders.isEmpty()) {
+            clientBuilder.customHeaders(customHeaders);
+        }
+        OpenAiClient client = clientBuilder.build();
         return new DeepSeekChatModel(client, getOrDefault(maxRetries, 2), modelName, temperature, maxTokens);
     }
 

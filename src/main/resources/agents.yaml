@@ -13,6 +13,14 @@ defaultModel: ocdeepseek
 workspaceRoot: /Users/yangtao/local-repo
 skipConfirmWorkspace: false
 
+# HTTP header attached to every LLM request. The header name is taken from
+# header.session.id.key and the value is a per-app-run UUID session id
+# generated at startup (see SessionIdProvider).
+header:
+  session:
+    id:
+      key: x-opencode-session
+
 agentDefaults:
   maxMessagesInMemory: 100
   maxToolCalls: 80

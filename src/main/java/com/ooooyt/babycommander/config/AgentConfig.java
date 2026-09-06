@@ -40,6 +40,10 @@ public class AgentConfig {
     @JsonProperty("showToolCallPairs")
     public boolean showToolCallPairs = false;
 
+    @JsonProperty("header")
+    @com.fasterxml.jackson.annotation.JsonSetter(nulls = com.fasterxml.jackson.annotation.Nulls.SKIP)
+    public HeaderConfig header = new HeaderConfig();
+
     public static class AgentDefaults {
         @JsonProperty("provider")
         public String provider = "openai";
@@ -193,5 +197,26 @@ public class AgentConfig {
 
         @JsonIgnore
         public transient java.util.List<java.util.regex.Pattern> compiledPatterns = new java.util.ArrayList<>();
+    }
+
+    public static class HeaderConfig {
+        @JsonProperty("session")
+        @com.fasterxml.jackson.annotation.JsonSetter(nulls = com.fasterxml.jackson.annotation.Nulls.SKIP)
+        public SessionHeaderConfig session = new SessionHeaderConfig();
+
+        public static class SessionHeaderConfig {
+            @JsonProperty("id")
+            @com.fasterxml.jackson.annotation.JsonSetter(nulls = com.fasterxml.jackson.annotation.Nulls.SKIP)
+            public IdHeaderConfig id = new IdHeaderConfig();
+
+            public static class IdHeaderConfig {
+                /**
+                 * HTTP header name carrying the per-app-run session id on every
+                 * LLM request. Defaults to {@code x-opencode-session}.
+                 */
+                @JsonProperty("key")
+                public String key = "x-opencode-session";
+            }
+        }
     }
 }
