@@ -80,7 +80,7 @@ providers:
     baseUrl: https://opencode.ai/zen/go/v1
     apiKey: ""
     maxRetries: 3
-    modelName: deepseek-v4-flash
+    modelName: deepseek-v4.1-flash
     temperature: 0.5
     maxTokens: 30720
     timeoutSeconds: 300
