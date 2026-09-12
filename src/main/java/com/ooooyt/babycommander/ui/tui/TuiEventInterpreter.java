@@ -54,6 +54,7 @@ final class TuiEventInterpreter {
                     if (msg.durationMs() > 0) {
                         // The final thought/response has arrived: stop the in-progress bar
                         model.thinking = false;
+                        model.agentBusy = false;
                         model.chatMessages.removeIf(cm ->
                             I18n.tr(MessageKey.STATUS_THINKING).equals(cm.source()));
                     }
@@ -95,9 +96,23 @@ final class TuiEventInterpreter {
                 model.dirty = true;
             }
             case UiEvent.SessionEvent se -> {
-                if (se.state() == UiEvent.SessionState.STARTED && !model.chatEngineReady) {
-                    model.chatEngineReady = true;
-                    model.dirty = true;
+                switch (se.state()) {
+                    case STARTED -> {
+                        if (!model.chatEngineReady) {
+                            model.chatEngineReady = true;
+                            model.dirty = true;
+                        }
+                    }
+                    case BUSY -> {
+                        // The agent started processing: lock the input box.
+                        model.agentBusy = true;
+                        model.dirty = true;
+                    }
+                    case READY_FOR_INPUT, STOPPED, ERROR -> {
+                        // The agent finished (or the session ended): unlock input.
+                        model.agentBusy = false;
+                        model.dirty = true;
+                    }
                 }
             }
             case UiEvent.PlanUpdate pu -> {
@@ -217,6 +232,7 @@ final class TuiEventInterpreter {
                 }
                 boolean wasThinking = model.thinking;
                 model.thinking = true;
+                model.agentBusy = true;
                 // Only reset the animation when starting a fresh thinking
                 // session. THINKING_STARTED also fires on every LLM round-trip
                 // within a multi-tool workflow; resetting each time would
@@ -254,6 +270,7 @@ final class TuiEventInterpreter {
                     model.chatVersion++;
                 }
                 model.thinking = false;
+                model.agentBusy = false;
                 model.autoScroll = true;
                 model.dirty = true;
                 yield "";

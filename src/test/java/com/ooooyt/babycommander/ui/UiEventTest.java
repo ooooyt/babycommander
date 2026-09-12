@@ -115,6 +115,12 @@ class UiEventTest {
     }
 
     @Test
+    void testSessionEventBusy() {
+        UiEvent event = new UiEvent.SessionEvent(UiEvent.SessionState.BUSY);
+        assertEquals(UiEvent.SessionState.BUSY, ((UiEvent.SessionEvent) event).state());
+    }
+
+    @Test
     void testPlanUpdate() {
         UiEvent.Phase phase1 = new UiEvent.Phase("phase1", "completed");
         UiEvent.Phase phase2 = new UiEvent.Phase("phase2", "running");
@@ -190,8 +196,9 @@ class UiEventTest {
 
     @Test
     void testSessionStateValues() {
-        assertEquals(4, UiEvent.SessionState.values().length);
+        assertEquals(5, UiEvent.SessionState.values().length);
         assertEquals(UiEvent.SessionState.STARTED, UiEvent.SessionState.valueOf("STARTED"));
+        assertEquals(UiEvent.SessionState.BUSY, UiEvent.SessionState.valueOf("BUSY"));
         assertEquals(UiEvent.SessionState.STOPPED, UiEvent.SessionState.valueOf("STOPPED"));
         assertEquals(UiEvent.SessionState.ERROR, UiEvent.SessionState.valueOf("ERROR"));
         assertEquals(UiEvent.SessionState.READY_FOR_INPUT, UiEvent.SessionState.valueOf("READY_FOR_INPUT"));

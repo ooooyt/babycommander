@@ -47,5 +47,5 @@ public sealed interface UiEvent {
     }
 
     enum MessageType { MARKDOWN, PLAIN, CODE }
-    enum SessionState { STARTED, STOPPED, ERROR, READY_FOR_INPUT }
+    enum SessionState { STARTED, BUSY, STOPPED, ERROR, READY_FOR_INPUT }
 }

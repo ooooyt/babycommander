@@ -172,8 +172,6 @@ public class ChatEngine {
             switch (command) {
                 case CommandEvent.UserInput input -> {
                     handleUserInput(input.text());
-                    ctx.eventBus().publish(UI_EVENT_ADDRESS,
-                        new UiEvent.SessionEvent(SessionState.READY_FOR_INPUT));
                 }
                 case CommandEvent.SessionCommand cmd -> handleSessionCommand(cmd.action());
                 case CommandEvent.ClarificationResponse r -> {
@@ -224,6 +222,12 @@ public class ChatEngine {
             return;
         }
 
+        // The remaining inputs all engage the agent (LLM call and/or tool
+        // execution), which can take a long time. Mark the session BUSY so
+        // the UI disables its input box until the run finishes and
+        // READY_FOR_INPUT is published from the completion paths below.
+        ctx.eventBus().publish(UI_EVENT_ADDRESS, new UiEvent.SessionEvent(SessionState.BUSY));
+
         // Try to detect a new project creation request before engaging the agent
         GenerateTask preDetect = generationRequestHandler.detectNewProject(trimmed);
         if (preDetect != null) {
@@ -249,6 +253,8 @@ public class ChatEngine {
                 new UiEvent.MessageOutput(
                     I18n.tr(MessageKey.CHAT_ERROR_GENERIC, "Failed to create chat session"),
                     MessageType.PLAIN));
+            ctx.eventBus().publish(UI_EVENT_ADDRESS,
+                new UiEvent.SessionEvent(SessionState.READY_FOR_INPUT));
             return;
         }
 

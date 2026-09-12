@@ -122,6 +122,7 @@ public enum MessageKey {
     TUI_TITLE("tui.title", " \u2ffb Baby Commander"),
     TUI_TITLE_LOADING("tui.title.loading", " \u2ffb Baby Commander (Loading...)"),
     TUI_INPUT_PLACEHOLDER("tui.input.placeholder", "Type anything  [\u2191\u2193] scroll  [PgUp/PgDn] page  [/quit or /exit] quit  [/help] help"),
+    TUI_INPUT_BUSY("tui.input.busy", "Agent is working... please wait for the current task to finish"),
     UI_WARN_PREFIX("ui.warn.prefix", "[Warn] "),
     STATUS_TOOL_CALLS("status.tool.calls", " tool calls"),
     // --- Confirmation Handler ---
@@ -239,6 +240,7 @@ public enum MessageKey {
     UI_LABEL_TASK("ui.label.task", "Task"),
     UI_LABEL_PLAN("ui.label.plan", "Plan"),
     UI_INITIALIZING("ui.initializing", "[Initializing...] System is still starting up. Please wait."),
+    UI_AGENT_BUSY("ui.agent.busy", "[Busy] The agent is still working. Please wait until the current task finishes."),
     UI_CONFIRM_HINT("ui.confirm.hint", "  (y/n{0})"),
     UI_INVALID_CHOICE("ui.invalid_choice", "Invalid choice {0}. Please enter a number between 1 and {1}."),
     UI_PLEASE_ENTER_NUMBER("ui.please_enter_number", "Please enter a number corresponding to one of the options."),

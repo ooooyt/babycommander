@@ -33,6 +33,17 @@ final class TuiModel {
     volatile boolean chatEngineReady = false;
 
     /**
+     * Whether the agent is currently processing a user request (thinking,
+     * calling tools, generating a project, etc.). While true the input box is
+     * disabled so commands such as {@code /exit} cannot interrupt an
+     * in-flight task. Driven by {@link com.ooooyt.babycommander.ui.UiEvent.SessionState#BUSY}
+     * and {@code READY_FOR_INPUT} events. Input stays enabled while a
+     * confirmation or clarification is pending because the agent is blocked
+     * waiting for the user's answer.
+     */
+    volatile boolean agentBusy = false;
+
+    /**
      * Whether the LLM is currently "thinking" (a request has been submitted
      * but the final thought/response has not yet been rendered). When true,
      * the left panel's second line shows the animated in-progress dot bar.

@@ -44,6 +44,25 @@ final class InputProcessor {
     }
 
     void processInput(String text) {
+        // Reject input while the agent is busy (thinking / calling tools /
+        // generating). This is the defensive backstop behind the read-loop
+        // gate in TerminalSession, so a command such as "/exit" that arrives
+        // mid-task via any other path cannot interrupt the in-flight run.
+        // Input is still accepted while a confirmation or clarification is
+        // pending because the agent is blocked waiting for the user's answer.
+        if (model.agentBusy
+                && model.pendingConfirmation == null
+                && model.pendingClarification == null) {
+            synchronized (model.chatMessages) {
+                model.chatMessages.add(new ChatMessage(
+                    I18n.tr(MessageKey.UI_AGENT_BUSY), I18n.tr(MessageKey.UI_AGENT_BUSY)));
+                model.chatVersion++;
+            }
+            model.autoScroll = true;
+            model.dirty = true;
+            return;
+        }
+
         if (!model.chatEngineReady) {
             synchronized (model.chatMessages) {
                 model.chatMessages.add(new ChatMessage(I18n.tr(MessageKey.UI_INITIALIZING),

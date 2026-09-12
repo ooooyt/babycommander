@@ -261,9 +261,19 @@ final class TuiRenderer {
     void drawInputLine(PrintWriter pw) {
         String prompt = ">> ";
         int promptLen = prompt.length();
+        // While the agent is busy the input box is disabled: show a busy hint
+        // instead of the user's input. The hint is suppressed while a
+        // confirmation or clarification is pending, since the agent is blocked
+        // waiting for the user's answer.
+        boolean inputLocked = model.agentBusy
+            && model.pendingConfirmation == null
+            && model.pendingClarification == null;
         String text = model.inputBuf.toString();
         boolean showPlaceholder = text.isEmpty() && model.chatEngineReady;
-        if (showPlaceholder) {
+        if (inputLocked) {
+            text = I18n.tr(MessageKey.TUI_INPUT_BUSY);
+            showPlaceholder = true;
+        } else if (showPlaceholder) {
             text = I18n.tr(MessageKey.TUI_INPUT_PLACEHOLDER);
         }
         int maxLen = model.tw - promptLen;

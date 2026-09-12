@@ -146,9 +146,20 @@ final class TerminalSession {
                     // the recompute below does not reopen the popup for the
                     // chosen command name (e.g. "/lang" still starts with '/').
                     boolean popupConfirmed = false;
+                    // While the agent is busy the input box is disabled: typed
+                    // characters and Enter/Tab are ignored so commands such as
+                    // /exit cannot interrupt an in-flight task. Navigation and
+                    // scrolling still work. Input stays enabled while a
+                    // confirmation or clarification is pending because the
+                    // agent is blocked waiting for the user's answer.
+                    boolean inputLocked = model.agentBusy
+                        && model.pendingConfirmation == null
+                        && model.pendingClarification == null;
 
                     if (ch == 13 || ch == 10 || ch == 9) {
-                        if (popupWasVisible && (ch == 9 || ch == 13 || ch == 10)) {
+                        if (inputLocked) {
+                            // Ignore submit while the agent is busy.
+                        } else if (popupWasVisible && (ch == 9 || ch == 13 || ch == 10)) {
                             // Confirm popup selection: replace the input
                             // buffer with the highlighted command name,
                             // close the popup, and position the cursor at
@@ -294,7 +305,7 @@ final class TerminalSession {
                             }
                         }
 
-                    } else if (ch >= 32) {
+                    } else if (ch >= 32 && !inputLocked) {
                         String s;
                         if (ch > 0xFFFF) {
                             s = new String(Character.toChars(ch));
